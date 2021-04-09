@@ -1,0 +1,1821 @@
+#DATA ANALYSIS THESIS MENNO BLOM
+
+#Structure KALDFJORDEN
+# 1. Data import (Beginning and end of measurement, surface)
+#       ADCP
+#       CTD
+#       Sedimenttrap
+# 2. Data cleaning
+#   2.1 Covert time from MATLAB to Python language
+#   2.2 All data to same sampling period
+#   2.3 Error filter (Correlation is still there but turned off)
+#   2.4 Vertical movement filter ADCP
+#   2.5 Determination TVG
+#   2.6 Taking out sediment trap in data
+#   2.7 Combining beams
+#   2.8 Interpolation
+#   2.9 Fast Forier Transformation -> what patterns visible?
+# 3. Making data presentable
+#   3.1 Filters, lowpassed, bandpass filter.
+#   3.2 Vertical velocity anomaly
+#   3.3 Model days of ADCP backscatter & vertical velocity
+# Export cleaned data as 'ADCP data Kaldfjorden clean'
+
+#IMPORT packages
+import scipy.io
+import scipy.interpolate
+import math
+import scipy.signal as sig
+import scipy.fftpack as sf
+import numpy as np
+import pandas as pd
+import matplotlib
+import matplotlib.pyplot as plt
+from matplotlib.collections import LineCollection
+from matplotlib.colors import ListedColormap, BoundaryNorm
+from matplotlib import cm
+import datetime
+import netCDF4
+from math import pi
+import gsw
+import pickle
+import netCDF4 as nc
+from netCDF4 import num2date, date2num
+from scipy.signal import welch, hanning
+import seaborn
+
+#CHAPTER 1 'Data import in Python'_______________________________________________________________________________
+
+#Import ADCP data Kaldfjorden_MATLAB dataset as dictionary
+Mooring1= scipy.io.loadmat('WHALE_ADCP_T1.mat')
+Mooring2= scipy.io.loadmat('WHALE_ADCP_T2.mat')
+
+#Extract data Mooring 1 (M1) from dictionary given a certain range to aacount for surface, beginning and end of measurement
+M1backscatbeam1_rel1=Mooring1['amp1'][15:7502,0:76]                         #Unit: dB (acc= 0.5dB/count)
+M1backscatbeam2_rel1=Mooring1['amp2'][15:7502,0:76]                         #Unit: dB (acc= 0.5dB/count)
+M1backscatbeam3_rel1=Mooring1['amp3'][15:7502,0:76]                         #Unit: dB (acc= 0.5dB/count)
+M1backscatbeam4_rel1=Mooring1['amp4'][15:7502,0:76]                         #Unit: dB (acc= 0.5dB/count)
+M1correlationbeam1=Mooring1['corr1'][15:7502,0:76]                          #Unit: % Difference inside and outside water (acc = 0-100)
+M1correlationbeam2=Mooring1['corr2'][15:7502,0:76]                          #Unit: % Difference inside and outside water (acc = 0-100)
+M1correlationbeam3=Mooring1['corr3'][15:7502,0:76]                          #Unit: % Difference inside and outside water (acc = 0-100)
+M1correlationbeam4=Mooring1['corr4'][15:7502,0:76]                          #Unit: % Difference inside and outside water (acc = 0-100)
+M1error=Mooring1['error'][15:7502,0:76]                                     #Unit: Binar; I assumes it gives an error code when there is an error at a certain ping
+M1headingrel=Mooring1['heading'][15:7502,0:76]                              #Unit: Degrees (acc=0.01 deg)
+#M1numberofbeams=(Mooring1['nbeams'])                                       #Unit: #
+M1pitch=Mooring1['pitch'][15:7502,0:76]                                     #Unit: Degrees (acc=0.01 deg)
+M1pressure=Mooring1['pr'][15:7502,0:76]                                     #Unit: dBAR (acc=0.001 dBar) pressure on first moment in time
+M1pressure_array=Mooring1['pr_array'][15:7502,0:76]                         #?? Unit: dBAR 
+M1pressure_vec=Mooring1['pr_vec']                                           #?? Unit:
+M1roll=Mooring1['roll'][15:7502,0:76]                                       #Unit: Degrees (acc=0.01 deg)
+M1timeofmeasurement=Mooring1['t'][15:7502,0:76]                             #Unit: ... #Measurments per day (13/day, every 2hours?)
+M1dayindication=(Mooring1['t_1d'])                                          #Unit: ... #Code for each day
+M1temperature=Mooring1['temp'][15:7502,0:76]                                #Unit: Celsius (acc= 0.01 C)
+#M1velocityeastX=(Mooring1['vele'])                                         #Unit: m/s
+#M1velocityeastX_filt=(Mooring1['vele_filt'])                               #Unit: m/s filtered out the small patterns to give a nicer image on large scale
+#M1velocityeastX_filt_1d=(Mooring1['vele_filt_1d'])                         #Unit: m/s averaged out the velocities per day 
+#M1velocityeastX_reg=(Mooring1['vele_reg'])                                 #Unit: m/s reg=remapped grid, pulled flat the water line        
+#M1velocitynorthY=(Mooring1['veln'])                                        #Unit: m/s
+#M1velocitynorthY_filt=(Mooring1['veln_filt'])                              #Unit: m/s filtered out the small patterns to give a nicer image on large scale
+#M1velocitynorthY_filt_1d=(Mooring1['veln_filt_1d'])                        #Unit: m/s averaged out the velocities per day
+#M1velocitynorthY_reg=(Mooring1['veln_reg'])                                #Unit: m/s reg=remapped grid, pulled flat the water line
+M1velocityupZ1=Mooring1['velup1'][15:7502,0:76]                             #Unit: m/s
+M1velocityupZ2=Mooring1['velup2'][15:7502,0:76]                             #Unit: m/s
+
+##Mooring 1 Specific parameters
+M1DepthADCP=np.average(gsw.z_from_p(np.delete(M1pressure,np.where(M1pressure<=100)),69+46.814/60))*-1   #Depth from ADCP unit=m - depth from ADCP.
+M1binsADCP=np.arange(0,76,1)                                                                            #Length bin = 2m.
+M1rangeADCP=np.arange(0,M1DepthADCP,1)
+M1depth=np.arange(0,int(M1DepthADCP),1)
+
+#Extract data Mooring 2 (M2) from dictionary
+M2backscatbeam1_rel1=Mooring2['amp1'][18:7500,0:63]                         #Unit: dB (acc= 0.5dB/count)      
+M2backscatbeam2_rel1=Mooring2['amp2'][18:7500,0:63]                         #Unit: dB (acc= 0.5dB/count)
+M2backscatbeam3_rel1=Mooring2['amp3'][18:7500,0:63]                         #Unit: dB (acc= 0.5dB/count)
+M2backscatbeam4_rel1=Mooring2['amp4'][18:7500,0:63]                         #Unit: dB (acc= 0.5dB/count)
+M2correlationbeam1=Mooring2['corr1'][18:7500,0:63]                          #Unit: % Difference inside and outside water (acc = 0-100)
+M2correlationbeam2=Mooring2['corr2'][18:7500,0:63]                          #Unit: % Difference inside and outside water (acc = 0-100)
+M2correlationbeam3=Mooring2['corr3'][18:7500,0:63]                          #Unit: % Difference inside and outside water (acc = 0-100)
+M2correlationbeam4=Mooring2['corr4'][18:7500,0:63]                          #Unit: % Difference inside and outside water (acc = 0-100)
+M2error=Mooring2['error'][18:7500,0:63]                                     #Unit: Binar; I assumes it gives an error code when there is an error at a certain ping
+M2headingrel=Mooring2['heading'][18:7500,0:63]                              #Unit: Degrees (acc=0.01 deg)
+#M2numberofbeams=(Mooring2['nbeams'])                                       #Unit: #
+M2pitch=Mooring2['pitch'][18:7500,0:63]                                     #Unit: Degrees (acc=0.01 deg)
+M2pressure=Mooring2['pr'][18:7500,0:63]                                     #Unit: dBAR (acc=0.001 dBar) pressure on first moment in time
+M2pressure_array=Mooring2['pr_array'][18:7500,0:63]                         #?? Unit: dBAR 
+M2pressure_vec=Mooring2['pr_vec']                                           #?? Unit:
+M2roll=Mooring2['roll'][18:7500,0:63]                                       #Unit: Degrees (acc=0.01 deg)
+M2timeofmeasurement=Mooring2['t'][18:7500,0:63]                             #Unit: ... #Measurments per day (13/day, every 2hours?)
+M2dayindication=(Mooring2['t_1d'])                                          #Unit: ... #Code for each day
+M2temperature=Mooring2['temp'][18:7500,0:63]                                #Unit: Celsius (acc= 0.01 C)
+#M2velocityeastX=(Mooring2['vele'])                                         #Unit: m/s
+#M2velocityeastX_filt=(Mooring2['vele_filt'])                               #Unit: m/s filtered out the small patterns to give a nicer image on large scale
+#M2velocityeastX_filt_1d=(Mooring2['vele_filt_1d'])                         #Unit: m/s averaged out the velocities per day 
+#M2velocityeastX_reg=(Mooring2['vele_reg'])                                 #Unit: m/s reg=remapped grid, pulled flat the water line        
+#M2velocitynorthY=(Mooring2['veln'])                                        #Unit: m/s
+#M2velocitynorthY_filt=(Mooring2['veln_filt'])                              #Unit: m/s filtered out the small patterns to give a nicer image on large scale
+#M2velocitynorthY_filt_1d=(Mooring2['veln_filt_1d'])                        #Unit: m/s averaged out the velocities per day
+#M2velocitynorthY_reg=(Mooring2['veln_reg'])                                #Unit: m/s reg=remapped grid, pulled flat the water line
+M2velocityupZ1=Mooring2['velup1'][18:7500,0:63]                             #Unit: m/s
+M2velocityupZ2=Mooring2['velup2'][18:7500,0:63]                             #Unit: m/s 
+
+##Mooring 2 specific parameters
+M2DepthADCP=np.average(gsw.z_from_p(np.delete(M2pressure,np.where(M2pressure<=100)),69+46.814/60))*-1
+M2binsADCP=np.arange(0,63,1)
+M2rangeADCP=np.arange(0,M2DepthADCP,1)
+M2depth=np.arange(0,int(M2DepthADCP),1)
+
+
+#Take sediment trap out of mooring 1
+M1backscatbeam1_rel1[0:2,21:23]=np.nan
+M1backscatbeam2_rel1[0:2,21:23]=np.nan
+M1backscatbeam3_rel1[0:2,21:23]=np.nan
+M1backscatbeam4_rel1[0:2,21:23]=np.nan
+M1correlationbeam1[0:2,21:23]=np.nan
+M1correlationbeam2[0:2,21:23]=np.nan
+M1correlationbeam3[0:2,21:23]=np.nan
+M1correlationbeam4[0:2,21:23]=np.nan
+M1velocityupZ1[0:2,21:23]=np.nan
+M1velocityupZ2[0:2,21:23]=np.nan
+
+#Take sediment trap out of mooring 2
+M2backscatbeam1_rel1[0:2,24]=np.nan
+M2backscatbeam2_rel1[0:2,24]=np.nan
+M2backscatbeam3_rel1[0:2,24]=np.nan
+M2backscatbeam4_rel1[0:2,24]=np.nan
+M2correlationbeam1[0:2,24]=np.nan
+M2correlationbeam2[0:2,24]=np.nan
+M2correlationbeam3[0:2,24]=np.nan
+M2correlationbeam4[0:2,24]=np.nan
+M2velocityupZ1[0:2,24]=np.nan
+M2velocityupZ2[0:2,24]=np.nan
+
+
+#Data Kaldfjorden_CTD dataset and extract Salinity, Temperature and Pressure data
+basectd=datetime.datetime(2017,9,7)         #Starttime CTD measurement
+
+#CTD_T1 for Mooring 1
+CTD_M1=netCDF4.Dataset(r'WHALE_CTD_transect_T1.nc', variables=['PSAL','POTEMP','PRES','TIME'])
+CTD_M1_Salinity = CTD_M1['PSAL'][:,2,:]             #Extracting Salinity data
+CTD_M1_Temperature = CTD_M1['POTEMP'][:,2,:]        #Extracting Temperature data
+CTD_M1_Pressure= CTD_M1['PRES'][:]                  #Extracting Pressure data
+CTD_M1_Time=netCDF4._netCDF4.num2date(CTD_M1['TIME'][:,2], units=CTD_M1['TIME'].units, calendar='standard',only_use_cftime_datetimes=False,only_use_python_datetimes=True)
+CTD_M1_Time[5]=np.NaN
+CTD_M1_bins=np.arange(0,len(CTD_M1_Pressure)*2*0.9804139432000052,2*0.9804139432000052)
+
+#CTD_T2 for Mooring 2
+CTD_M2=netCDF4.Dataset(r'WHALE_CTD_transect_T2.nc',variables=['PSAL','POTEMP','PRES','TIME'])
+CTD_M2_Salinity = CTD_M2['PSAL'][:,2,:]             #Unit: Psu              Extracting Salinity data
+CTD_M2_Temperature = CTD_M2['POTEMP'][:,2,:]        #Unit: Degrees Celsius  Extracting Temperature data
+CTD_M2_Pressure= CTD_M2['PRES'][:]                  #Unit: decibar.         Extracting Pressure data
+CTD_M2_Time=netCDF4._netCDF4.num2date(CTD_M2['TIME'][:,2], units=CTD_M2['TIME'].units, calendar='standard',only_use_cftime_datetimes=False, only_use_python_datetimes=True)
+CTD_M2_Time[5]=np.NaN
+CTD_M2_bins=np.arange(0,len(CTD_M2_Pressure)*2*0.9804139432000052,2*0.9804139432000052)
+
+#Sediment trap data Kaldfjorden
+#Import Sediment trap data Kaldfjorden
+df=pd.DataFrame(pd.read_csv('Kaldfjorden sediment trap data.csv', sep=';',error_bad_lines=False))
+Timestart=pd.to_datetime(df['start'], format='%d/%m/%Y')# + ' to ' + df['POC (mg C m-2 d-1).1']
+Timeend=pd.to_datetime(df['end'], format='%d/%m/%Y')
+apoc=df['POC (mg C m-2 d-1).1']
+atpm=df['TPM (g m-2 d-1).1']
+achl=df['Chl a (ug m-2 d-1).1']
+aphy=df['Diatoms total (million cells m-2 d-1).1']
+azoo=df['Zooplankton Swimmers.1']
+bpoc=df['POC (mg C m-2 d-1)']
+btpm=df['TPM (g m-2 d-1)']
+bchl=df['Chl a (ug m-2 d-1)']
+bphy=df['Diatoms total (million cells m-2 d-1)']
+bzoo=df['Zooplankton Swimmers']
+
+
+#CHAPTER 2: KALDFJORDEN DATA CLEANING___________________________________________________________________________
+
+#2.1 GENERAL Convert MATLAB datenum to Python datetime____________________________________________________________
+
+#2.1.1 Mooring 1
+
+##Time each measurement
+M1timeofmeasurementp=np.zeros(((len(M1timeofmeasurement)),1),dtype='datetime64[h]') #Make array with datetime64 type cells, h is unit
+
+for i in range(len(M1timeofmeasurement)):                                           # for the number of rows in M1timeofmeasurement do:
+    
+    ind_pos=i                                                                       #give the value of cell in row i to ind_pos
+    
+    a= pd.to_datetime(M1timeofmeasurement[ind_pos]-719529, unit='D').round('s')     # Convert every MATLAB date to Python date. 
+    
+    M1timeofmeasurementp[i,:]=a                                                     # write result of a in M1timeofmeasurementp in the row of i.
+    
+    i=i+1                                                                           # next loop
+    
+##Day indication
+M1dayindicationp=np.zeros((320,1),dtype='datetime64[h]')                            #Make array with datetime64 type cells, h is unit
+ 
+for i in range(320):                                                                # for the number of columns in M1timeofmeasurement do:
+    
+    ind_pos=i
+    
+    a=pd.to_datetime(M1dayindication[0,i]-719529, unit='D').round('s')             #now not hours but days because 'day' indication
+      
+    M1dayindicationp[i,:]=a
+    
+    i=i+1
+  
+#2.1.2 Mooring 2
+
+##Time each measurement
+M2timeofmeasurementp=np.zeros(((len(M2timeofmeasurement)),1),dtype='datetime64[h]') 
+
+for i in range(len(M2timeofmeasurement)):                                          
+    
+    ind_pos=i                                                                      
+    
+    a= pd.to_datetime(M2timeofmeasurement[ind_pos]-719529, unit='D').round('s')     
+    
+    M2timeofmeasurementp[i,:]=a                                                    
+    
+    i=i+1 # next loop
+
+##Day indication
+M2dayindicationp=np.zeros((320,1),dtype='datetime64[h]')
+ 
+for i in range(320): 
+    
+    ind_pos=i
+    
+    a=pd.to_datetime(M2dayindication[0,i]-719529, unit='D').round('s')
+    M2dayindicationp[i,:]=a
+    
+    i=i+1
+
+#2.2 PUT ALL DATA ON THE SAME SAMPLING PERIOD
+
+##Sediment trap measurements monthly to hourly    
+M1timeofmeasurement=pd.to_datetime(M1timeofmeasurementp[:,0],format='%H:%M %d/%m/%Y')
+M2timeofmeasurement=pd.to_datetime(M2timeofmeasurementp[:,0],format='%H:%M %d/%m/%Y')
+           
+M1poc=np.zeros(((len(M1timeofmeasurement),1)),dtype='float')
+M1tpm=np.zeros(((len(M1timeofmeasurement),1)),dtype='float')
+M1chl=np.zeros(((len(M1timeofmeasurement),1)),dtype='float')
+M1phy=np.zeros(((len(M1timeofmeasurement),1)),dtype='float')
+M1zoo=np.zeros(((len(M1timeofmeasurement),1)),dtype='float')
+M2poc=np.zeros(((len(M2timeofmeasurement),1)),dtype='float')
+M2tpm=np.zeros(((len(M2timeofmeasurement),1)),dtype='float')
+M2chl=np.zeros(((len(M2timeofmeasurement),1)),dtype='float')
+M2phy=np.zeros(((len(M2timeofmeasurement),1)),dtype='float')
+M2zoo=np.zeros(((len(M2timeofmeasurement),1)),dtype='float')
+   
+for i in range(len(M1timeofmeasurement)):
+    
+    for j in range(len(apoc)):
+        
+        if Timestart[j] <= M1timeofmeasurement[i] <= Timeend[j]:        # if time of measurement is inbetween start and finish of measurement
+            M1poc[i,0]=apoc[j]
+            M1tpm[i,0]=atpm[j]
+            M1chl[i,0]=achl[j]
+            M1phy[i,0]=aphy[j]
+            M1zoo[i,0]=azoo[j]
+        
+            j=j+1
+    i=i+1
+    
+for i in range(len(M2timeofmeasurement)):
+    
+    for j in range(len(bpoc)):
+              
+        if Timestart[j] <= M2timeofmeasurement[i] <= Timeend[j]:        # if time of measurement is inbetween start and finish of measurement
+            M2poc[i,0]=bpoc[j]
+            M2tpm[i,0]=btpm[j]
+            M2chl[i,0]=bchl[j]
+            M2phy[i,0]=bphy[j]
+            M2zoo[i,0]=bzoo[j]
+
+            j=j+1
+    i=i+1
+
+#Mooring 1 CTD
+#M1 Temperature for each depth at each time measurement
+CTD_M1_time_month=np.zeros((1,len(CTD_M1_Temperature)),dtype='float')                           
+CTD_M1_time_hours=(pd.Series(CTD_M1_Temperature[:,1],index=CTD_M1_Time).resample('H').mean()).index #resample time from months to hours
+
+CTD_M1_Temp_month=np.zeros((len(M1depth),len(CTD_M1_time_month[0,:])),dtype='float')
+CTD_M1_Temp_hours=np.zeros((len(M1depth),len(CTD_M1_time_hours)),dtype='float')
+
+for i in range(len(CTD_M1_Temperature[:,1])):
+    a=scipy.interpolate.interp1d(CTD_M1_bins,CTD_M1_Temperature[i,:],fill_value='extrapolate')      #interpolate measurments from bins to entire depth ADCP.
+
+    CTD_M1_Temp_month[:,i]=a(M1depth)
+    
+    i=i+1
+
+c=CTD_M1_Temp_month[4,3]        #Fill empty cells with nearest value.
+d=CTD_M1_Temp_month[2,7]
+e=CTD_M1_Temp_month[2,8]
+f=CTD_M1_Temp_month[2,11]
+g=CTD_M1_Temp_month[2,17]
+CTD_M1_Temp_month[0,3]=c
+CTD_M1_Temp_month[1,3]=c
+CTD_M1_Temp_month[2,3]=c
+CTD_M1_Temp_month[3,3]=c
+CTD_M1_Temp_month[0,7]=d
+CTD_M1_Temp_month[1,7]=d
+CTD_M1_Temp_month[0,8]=e
+CTD_M1_Temp_month[1,8]=e
+CTD_M1_Temp_month[0,11]=f
+CTD_M1_Temp_month[1,11]=f
+CTD_M1_Temp_month[0,17]=g
+CTD_M1_Temp_month[1,17]=g
+
+for i in range(len(CTD_M1_Temp_hours[:,1])):
+    
+    a=pd.Series(CTD_M1_Temp_month[i,:],index=CTD_M1_Time).resample('H').mean()      # Interpolate from temperature per month to temperature per hour.
+
+    CTD_M1_Temp_hours[i,:]=a.interpolate(method='time')
+
+    i=i+1
+
+
+#M1 Salinity for each depth at each time measurement # Same as for temperature
+CTD_M1_Sal_month=np.zeros((len(M1depth),len(CTD_M1_time_month[0,:])),dtype='float')
+CTD_M1_Sal_hours=np.zeros((len(M1depth),len(CTD_M1_time_hours)),dtype='float')
+
+for i in range(len(CTD_M1_Salinity[:,1])):
+    a=scipy.interpolate.interp1d(CTD_M1_bins,CTD_M1_Salinity[i,:],fill_value='extrapolate')
+
+    CTD_M1_Sal_month[:,i]=a(M1depth)
+    
+    i=i+1
+
+#a=pd.DataFrame(np.where(CTD_M1_Sal_month>40,np.NaN,CTD_M1_Sal_month))
+#b=a.ffill(axis=0)
+#CTD_M1_Sal_month=np.array(b)
+c=CTD_M1_Sal_month[4,3]
+d=CTD_M1_Sal_month[2,7]
+e=CTD_M1_Sal_month[2,8]
+f=CTD_M1_Sal_month[2,11]
+g=CTD_M1_Sal_month[2,17]
+CTD_M1_Sal_month[0,3]=c
+CTD_M1_Sal_month[1,3]=c
+CTD_M1_Sal_month[2,3]=c
+CTD_M1_Sal_month[3,3]=c
+CTD_M1_Sal_month[0,7]=d
+CTD_M1_Sal_month[1,7]=d
+CTD_M1_Sal_month[0,8]=e
+CTD_M1_Sal_month[1,8]=e
+CTD_M1_Sal_month[0,11]=f
+CTD_M1_Sal_month[1,11]=f
+CTD_M1_Sal_month[0,17]=g
+CTD_M1_Sal_month[1,17]=g
+
+
+for i in range(len(CTD_M1_Sal_hours[:,1])):
+    
+    a=pd.Series(CTD_M1_Sal_month[i,:],index=CTD_M1_Time).resample('H').mean()
+
+    CTD_M1_Sal_hours[i,:]=a.interpolate(method='time')
+
+    i=i+1
+
+#Mooring 2 CTD
+##M2 Temperature for each depth and time of measurement
+CTD_M2_time_month=np.zeros((1,len(CTD_M2_Temperature)),dtype='float')
+CTD_M2_time_hours=(pd.Series(CTD_M2_Temperature[:,1],index=CTD_M2_Time).resample('H').mean()).index
+
+CTD_M2_Temp_month=np.zeros((len(M2depth),len(CTD_M2_time_month[0,:])),dtype='float')
+CTD_M2_Temp_hours=np.zeros((len(M2depth),len(CTD_M2_time_hours)),dtype='float')
+
+for i in range(len(CTD_M2_Temperature[:,1])):
+    a=scipy.interpolate.interp1d(CTD_M2_bins,CTD_M2_Temperature[i,:],fill_value='extrapolate')
+
+    CTD_M2_Temp_month[:,i]=a(M2depth)
+    
+    i=i+1
+
+c=CTD_M2_Temp_month[4,3]
+d=CTD_M2_Temp_month[2,7]
+e=CTD_M2_Temp_month[2,8]
+f=CTD_M2_Temp_month[2,10]
+g=CTD_M2_Temp_month[2,16]
+CTD_M2_Temp_month[0,3]=c
+CTD_M2_Temp_month[1,3]=c
+CTD_M2_Temp_month[2,3]=c
+CTD_M2_Temp_month[3,3]=c
+CTD_M2_Temp_month[0,7]=d
+CTD_M2_Temp_month[1,7]=d
+CTD_M2_Temp_month[0,8]=e
+CTD_M2_Temp_month[1,8]=e
+CTD_M2_Temp_month[0,10]=f
+CTD_M2_Temp_month[1,10]=f
+CTD_M2_Temp_month[0,16]=g
+CTD_M2_Temp_month[1,16]=g
+
+for i in range(len(CTD_M2_Temp_hours[:,1])):
+    
+    a=pd.Series(CTD_M2_Temp_month[i,:],index=CTD_M2_Time).resample('H').mean()
+
+    CTD_M2_Temp_hours[i,:]=a.interpolate(method='time')
+
+    i=i+1
+
+##M2 Salinity for each depth at each time measurement
+CTD_M2_Sal_month=np.zeros((len(M2depth),len(CTD_M2_time_month[0,:])),dtype='float')
+CTD_M2_Sal_hours=np.zeros((len(M2depth),len(CTD_M2_time_hours)),dtype='float')
+
+for i in range(len(CTD_M2_Salinity[:,1])):
+    a=scipy.interpolate.interp1d(CTD_M2_bins,CTD_M2_Salinity[i,:],fill_value='extrapolate')
+
+    CTD_M2_Sal_month[:,i]=a(M2depth)
+    
+    i=i+1
+
+c=CTD_M2_Sal_month[4,3]
+d=CTD_M2_Sal_month[2,7]
+e=CTD_M2_Sal_month[2,8]
+f=CTD_M2_Sal_month[2,10]
+g=CTD_M2_Sal_month[2,16]
+CTD_M2_Sal_month[0,3]=c
+CTD_M2_Sal_month[1,3]=c
+CTD_M2_Sal_month[2,3]=c
+CTD_M2_Sal_month[3,3]=c
+CTD_M2_Sal_month[0,7]=d
+CTD_M2_Sal_month[1,7]=d
+CTD_M2_Sal_month[0,8]=e
+CTD_M2_Sal_month[1,8]=e
+CTD_M2_Sal_month[0,10]=f
+CTD_M2_Sal_month[1,10]=f
+CTD_M2_Sal_month[0,16]=g
+CTD_M2_Sal_month[1,16]=g
+
+for i in range(len(CTD_M2_Sal_hours[:,1])):
+    
+    a=pd.Series(CTD_M2_Sal_month[i,:],index=CTD_M2_Time).resample('H').mean()
+
+    CTD_M2_Sal_hours[i,:]=a.interpolate(method='time')
+
+    i=i+1 
+    
+#2.3 Error - When error code, total measurement out, correlation is still there but taken out -> can indicate fish____________
+
+#2.2.1 Mooring 1
+for i in range(len(M1timeofmeasurementp)):          #per unit of time
+    
+    for j in range(len(M1binsADCP)):                #each bin depth
+        
+    ##CORRELATION        
+        if M1correlationbeam1[i,j] <=50:            #If correlation is lower than 50 -> np.NaN
+            M1backscatbeam1_rel1[i,j]=np.nan
+            M1velocityupZ1[i,j]=np.nan
+            M1velocityupZ2[i,j]=np.nan
+        
+        if M1correlationbeam2[i,j] <=50:
+            M1backscatbeam2_rel1[i,j]=np.nan
+            M1velocityupZ1[i,j]=np.nan
+            M1velocityupZ2[i,j]=np.nan
+        
+        if M1correlationbeam3[i,j] <=50:
+            M1backscatbeam3_rel1[i,j]=np.nan
+            M1velocityupZ1[i,j]=np.nan
+            M1velocityupZ2[i,j]=np.nan
+        
+        if M1correlationbeam4[i,j] <=50:
+            M1backscatbeam4_rel1[i,j]=np.nan
+            M1velocityupZ1[i,j]=np.nan
+            M1velocityupZ2[i,j]=np.nan
+                        
+        j=j+1
+    
+    ##ERROR
+    if M1error[i,0] >0:
+        M1backscatbeam1_rel1[i,:]=np.nan            #If error is >1 Entire measurement -> np.nan
+        M1backscatbeam2_rel1[i,:]=np.nan
+        M1backscatbeam3_rel1[i,:]=np.nan
+        M1backscatbeam4_rel1[i,:]=np.nan
+    
+    i=i+1
+
+#2.2.2 Mooring 2
+for i in range(len(M2timeofmeasurementp)):
+    
+    for j in range(len(M2binsADCP)):
+    
+    ##CORRELATION
+        if M2correlationbeam1[i,j] <=50:
+            M2backscatbeam1_rel1[i,j]=np.nan
+            M2velocityupZ1[i,j]=np.nan
+            M2velocityupZ2[i,j]=np.nan          
+        
+        if M2correlationbeam2[i,j] <=50:
+            M2backscatbeam2_rel1[i,j]=np.nan
+            M2velocityupZ1[i,j]=np.nan
+            M2velocityupZ2[i,j]=np.nan
+        
+        if M2correlationbeam3[i,j] <=50:
+            M2backscatbeam3_rel1[i,j]=np.nan
+            M2velocityupZ1[i,j]=np.nan
+            M2velocityupZ2[i,j]=np.nan
+        
+        if M2correlationbeam4[i,j] <=50:
+            M2backscatbeam4_rel1[i,j]=np.nan
+            M2velocityupZ1[i,j]=np.nan
+            M2velocityupZ2[i,j]=np.nan
+
+        j=j+1
+    
+    ##ERROR
+    if M2error[i,0] >0:
+        M2backscatbeam1_rel1[i,:]=np.nan
+        M2backscatbeam2_rel1[i,:]=np.nan
+        M2backscatbeam3_rel1[i,:]=np.nan
+        M2backscatbeam4_rel1[i,:]=np.nan
+    
+    i=i+1
+ 
+    
+    
+#2.4 TAKING OUT THE MOVEMENT OF THE ADCP_____________________________________________________________________________________________________________________
+
+#Make dataarrays
+M1backscatbeam1_rel2=np.zeros((len(M1timeofmeasurementp),int(M1DepthADCP)),dtype='float')
+M1backscatbeam2_rel2=np.zeros((len(M1timeofmeasurementp),int(M1DepthADCP)),dtype='float')
+M1backscatbeam3_rel2=np.zeros((len(M1timeofmeasurementp),int(M1DepthADCP)),dtype='float')
+M1backscatbeam4_rel2=np.zeros((len(M1timeofmeasurementp),int(M1DepthADCP)),dtype='float')
+M1corbeam1=np.zeros((len(M1timeofmeasurementp),int(M1DepthADCP)),dtype='float')
+M1corbeam2=np.zeros((len(M1timeofmeasurementp),int(M1DepthADCP)),dtype='float')
+M1corbeam3=np.zeros((len(M1timeofmeasurementp),int(M1DepthADCP)),dtype='float')
+M1corbeam4=np.zeros((len(M1timeofmeasurementp),int(M1DepthADCP)),dtype='float')
+M1vup1=np.zeros((len(M1timeofmeasurementp),int(M1DepthADCP)),dtype='float')
+M1vup2=np.zeros((len(M1timeofmeasurementp),int(M1DepthADCP)),dtype='float')
+M1pressure_hours=np.zeros((len(M1timeofmeasurementp),int(M1DepthADCP)),dtype='float')
+
+for i in range(len(M1timeofmeasurementp)):  #for each measurement
+    
+    
+    a=scipy.interpolate.interp1d(M1pressure_array[i,:],M1backscatbeam1_rel1[i,:],'linear',fill_value='extrapolate') #interpolate between depth and backscatter/ vertical velocity -> assign to new depth.
+    M1backscatbeam1_rel2[i,:]=a(M1depth)
+
+    a=scipy.interpolate.interp1d(M1pressure_array[i,:],M1backscatbeam2_rel1[i,:],'linear',fill_value='extrapolate')
+    M1backscatbeam2_rel2[i,:]=a(M1depth)
+
+    a=scipy.interpolate.interp1d(M1pressure_array[i,:],M1backscatbeam3_rel1[i,:],'linear',fill_value='extrapolate')
+    M1backscatbeam3_rel2[i,:]=a(M1depth)
+
+    a=scipy.interpolate.interp1d(M1pressure_array[i,:],M1backscatbeam4_rel1[i,:],'linear',fill_value='extrapolate')
+    M1backscatbeam4_rel2[i,:]=a(M1depth)
+    
+    a=scipy.interpolate.interp1d(M1pressure_array[i,:],M1correlationbeam1[i,:],'linear',fill_value='extrapolate')
+    M1corbeam1[i,:]=a(M1depth)
+    
+    a=scipy.interpolate.interp1d(M1pressure_array[i,:],M1correlationbeam2[i,:],'linear',fill_value='extrapolate')
+    M1corbeam2[i,:]=a(M1depth)
+
+    a=scipy.interpolate.interp1d(M1pressure_array[i,:],M1correlationbeam3[i,:],'linear',fill_value='extrapolate')
+    M1corbeam3[i,:]=a(M1depth)
+
+    a=scipy.interpolate.interp1d(M1pressure_array[i,:],M1correlationbeam4[i,:],'linear',fill_value='extrapolate')
+    M1corbeam4[i,:]=a(M1depth)
+
+    a=scipy.interpolate.interp1d(M1pressure_array[i,:],M1velocityupZ1[i,:],'linear',fill_value='extrapolate')
+    M1vup1[i,:]=a(M1depth)
+
+    a=scipy.interpolate.interp1d(M1pressure_array[i,:],M1velocityupZ2[i,:],'linear',fill_value='extrapolate')
+    M1vup2[i,:]=a(M1depth)
+    
+    a=scipy.interpolate.interp1d(M1pressure_array[i,:],M1pressure_array[i,:],'linear',fill_value='extrapolate')
+    M1pressure_hours[i,:]=a(M1depth)
+   
+
+    i=i+1
+    
+# =============================================================================
+# plt.plot(M1pressure_array[15,:],M1correlationbeam1[15,:],'bo', M1depth, M1corbeam1[15,:],'r')    
+# plt.plot(M1pressure_array[15,:],M1backscatbeam2_rel1[15,:],'bo', M1depth, M1backscatbeam2_rel2[15,:],'r')    
+# plt.plot(M1pressure_array[15,:],M1correlationbeam3[15,:],'bo', M1depth, M1corbeam3[15,:],'r')    
+# plt.plot(M1pressure_array[15,:],M1correlationbeam4[15,:],'bo', M1depth, M1corbeam4[15,:],'r')    
+# 
+# =============================================================================
+#CHECK plt.plot(M1pressure_array[15,:],M1backscatbeam1_rel1[15,:], 'bo', M1depth, M1backscatbeam1_rel2[15,:], 'r')
+
+M2backscatbeam1_rel2=np.zeros((len(M2timeofmeasurementp),int(M2DepthADCP)),dtype='float')
+M2backscatbeam2_rel2=np.zeros((len(M2timeofmeasurementp),int(M2DepthADCP)),dtype='float')
+M2backscatbeam3_rel2=np.zeros((len(M2timeofmeasurementp),int(M2DepthADCP)),dtype='float')
+M2backscatbeam4_rel2=np.zeros((len(M2timeofmeasurementp),int(M2DepthADCP)),dtype='float')
+M2corbeam1=np.zeros((len(M2timeofmeasurementp),int(M2DepthADCP)),dtype='float')
+M2corbeam2=np.zeros((len(M2timeofmeasurementp),int(M2DepthADCP)),dtype='float')
+M2corbeam3=np.zeros((len(M2timeofmeasurementp),int(M2DepthADCP)),dtype='float')
+M2corbeam4=np.zeros((len(M2timeofmeasurementp),int(M2DepthADCP)),dtype='float')
+M2vup1=np.zeros((len(M2timeofmeasurementp),int(M2DepthADCP)),dtype='float')
+M2vup2=np.zeros((len(M2timeofmeasurementp),int(M2DepthADCP)),dtype='float')
+M2pressure_hours=np.zeros((len(M2timeofmeasurementp),int(M2DepthADCP)),dtype='float')
+
+for i in range(len(M2timeofmeasurementp)):
+
+    a=scipy.interpolate.interp1d(M2pressure_array[i,:], M2backscatbeam1_rel1[i,:],'linear',fill_value='extrapolate')
+    M2backscatbeam1_rel2[i,:]=a(M2depth)
+
+    a=scipy.interpolate.interp1d(M2pressure_array[i,:], M2backscatbeam2_rel1[i,:],'linear',fill_value='extrapolate')
+    M2backscatbeam2_rel2[i,:]=a(M2depth)
+    
+    a=scipy.interpolate.interp1d(M2pressure_array[i,:], M2backscatbeam3_rel1[i,:],'linear',fill_value='extrapolate')
+    M2backscatbeam3_rel2[i,:]=a(M2depth)
+
+    a=scipy.interpolate.interp1d(M2pressure_array[i,:], M2backscatbeam4_rel1[i,:],'linear',fill_value='extrapolate')
+    M2backscatbeam4_rel2[i,:]=a(M2depth)
+    
+    a=scipy.interpolate.interp1d(M2pressure_array[i,:],M2correlationbeam1[i,:],'linear',fill_value='extrapolate')
+    M2corbeam1[i,:]=a(M2depth)
+    
+    a=scipy.interpolate.interp1d(M2pressure_array[i,:],M2correlationbeam2[i,:],'linear',fill_value='extrapolate')
+    M2corbeam2[i,:]=a(M2depth)
+
+    a=scipy.interpolate.interp1d(M2pressure_array[i,:],M2correlationbeam3[i,:],'linear',fill_value='extrapolate')
+    M2corbeam3[i,:]=a(M2depth)
+
+    a=scipy.interpolate.interp1d(M2pressure_array[i,:],M2correlationbeam4[i,:],'linear',fill_value='extrapolate')
+    M2corbeam4[i,:]=a(M2depth)
+
+    
+    a=scipy.interpolate.interp1d(M2pressure_array[i,:],M2velocityupZ1[i,:],'linear',fill_value='extrapolate')
+    M2vup1[i,:]=a(M2depth)
+
+    a=scipy.interpolate.interp1d(M2pressure_array[i,:],M2velocityupZ2[i,:],'linear',fill_value='extrapolate')
+    M2vup2[i,:]=a(M2depth)
+
+    a=scipy.interpolate.interp1d(M2pressure_array[i,:],M2pressure_array[i,:],'linear',fill_value='extrapolate')
+    M2pressure_hours[i,:]=a(M2depth)
+
+    i=i+1  
+
+# =============================================================================
+# plt.plot(M2pressure_array[15,:],M2correlationbeam1[15,:],'bo', M2depth, M2corbeam1[15,:],'r')    
+# plt.plot(M2pressure_array[15,:],M2correlationbeam2[15,:],'bo', M2depth, M2corbeam2[15,:],'r')    
+# plt.plot(M2pressure_array[15,:],M2correlationbeam3[15,:],'bo', M2depth, M2corbeam3[15,:],'r')    
+# plt.plot(M2pressure_array[15,:],M2correlationbeam4[15,:],'bo', M2depth, M2corbeam4[15,:],'r')    
+# 
+# =============================================================================
+#CHECK plt.plot(M2pressure_array[15,:],M2velocityupZ2[15,:], 'bo', M2depth[1,:], M2vup2[15,:], 'r')
+
+
+#Density
+M1_Density=np.zeros((len(M1depth),len(M1timeofmeasurementp)),dtype='float')
+M2_Density=np.zeros((len(M2depth),len(M2timeofmeasurementp)),dtype='float')
+
+a=np.min(M1timeofmeasurementp)         #First measurement of ADCP 
+b=np.max(M1timeofmeasurementp)         #Last measurement of ADCP 
+c=np.where(CTD_M1_time_hours==a)       #Row of CTD measurement where ADCP made its FIRST measurement
+d=np.where(CTD_M1_time_hours==b)       #Row of CTD measurement where ADCP made its LAST measurement
+
+for i in range(len(M1depth)):
+    
+    for j in range(len(M1timeofmeasurementp)):
+        
+        e=gsw.density.rho_t_exact(CTD_M1_Sal_hours[i,c[0]+j],CTD_M1_Temp_hours[i,int(c[0]+j)],M1pressure_hours[j,i])
+
+        M1_Density[i,j]=e
+        
+        j=j+1
+        
+    i=i+1
+    
+    
+a=np.min(M2timeofmeasurementp)         #First measurement of ADCP 
+b=np.max(M2timeofmeasurementp)         #Last measurement of ADCP 
+c=np.where(CTD_M2_time_hours==a)       #Row of CTD measurement where ADCP made its FIRST measurement
+d=np.where(CTD_M2_time_hours==b)       #Row of CTD measurement where ADCP made its LAST measurement
+
+for i in range(len(M2depth)):
+    
+    for j in range(len(M2timeofmeasurementp)):
+        
+        e=gsw.density.rho_t_exact(CTD_M2_Sal_hours[i,c[0]+j],CTD_M2_Temp_hours[i,int(c[0]+j)],M2pressure_hours[j,i])
+
+        M2_Density[i,j]=e
+        
+        j=j+1
+        
+    i=i+1
+
+#2.5 DETERMINING DEGREDATION OF SIGNAL OVER DISTANCE FROM AND TOWARDS ADCPs (TIME VARIED GAIN)______________________________________
+
+#f(ADCP)= 250Hz...The Francois & Garrison, 1982 formula is used because it is suitable for a sound frequency 
+#range of 200 Hz to 1MH. In seawater sound is absorbed by 3 parts, together forming the total sound absorption
+#Part I (boric acid), part II (MgSO4), part III (Pure water)
+
+#For this the following parameters for both Mooring 1 and 2
+pH= 7   #Acidity unit: scale 1(acid) - 14(base) 
+f=250 #Frequency sound signal ADCP, unit: kHz
+
+#2.4.1 Mooring 1
+#ADCP_M1_Depth=np.arange(0,len(M1depth),1)
+
+a=np.min(M1timeofmeasurementp)         #First measurement of ADCP 
+b=np.max(M1timeofmeasurementp)         #Last measurement of ADCP 
+c=np.where(CTD_M1_time_hours==a)       #Row of CTD measurement where ADCP made its FIRST measurement
+d=np.where(CTD_M1_time_hours==b)       #Row of CTD measurement where ADCP made its LAST measurement
+
+#CHECK
+#print(M1timeofmeasurementp[0])
+#print(CTD_M1_time_hours[c])
+#print(M1timeofmeasurementp[7486])
+#print(CTD_M1_time_hours[d])
+
+M1_Sal_hours=CTD_M1_Sal_hours[:,int(c[0]-1):int(d[0]+1)]    #Make new file where Salinity and temperature are extracted based on ADCP measurments -> result = sal+temp for each ADCP measurement of the ADCP
+M1_Temp_hours=CTD_M1_Temp_hours[:,int(c[0]-1):int(d[0]+1)]
+
+##Make data file & run loop
+M1sound_abs=np.zeros((len(M1timeofmeasurementp),int(M1DepthADCP)),dtype='float')            
+M1tvg=np.zeros((len(M1timeofmeasurementp),int(M1DepthADCP)),dtype='float')                  
+M1backscatbeam1=np.zeros((len(M1backscatbeam1_rel1),int(M1DepthADCP)),dtype='float')
+M1backscatbeam2=np.zeros((len(M1backscatbeam2_rel1),int(M1DepthADCP)),dtype='float')
+M1backscatbeam3=np.zeros((len(M1backscatbeam3_rel1),int(M1DepthADCP)),dtype='float')
+M1backscatbeam4=np.zeros((len(M1backscatbeam4_rel1),int(M1DepthADCP)),dtype='float') 
+
+for i in range(len(M1timeofmeasurementp)):  #Within that loop do for each week
+   
+    for j in range(len(M1depth)):      #For each depth do the following loop
+    
+        #Part I: Sound absorption by boric acid CHECK
+        c = 1412 + 3.21*M1_Temp_hours[j,i] + 1.19*M1_Sal_hours[j,i] + 0.0167*M1depth[j]                     #Speed of sound (m/s)
+        A1 = (8.86 * (10**(0.78*pH - 5)))/ c                    #
+        f1 = (2.8 * np.sqrt(M1_Sal_hours[j,i]/35) )* (10**((4 - 1245)/(273+M1_Temp_hours[j,i])))            #unit= kHz
+        alphapI= (A1*1*f1*f**2)/(f1**2+f**2)                                                                #dB/km-1
+        
+        #Part II: Sound absorption by MgSO4 CHECK
+        A2 = 21.44 * (M1_Sal_hours[j,i]/c) * (1 + 0.025 * M1_Temp_hours[j,i])                               # dB/km/kHz
+        P2 = 1 - 1.37e-4*M1depth[j]  + 6.2e-9*M1depth[j] **2
+        f2 = (8.17 * 10 **((8 - 1990)/(273+M1_Temp_hours[j,i]))) / (1+0.0018*(M1_Sal_hours[j,i]-35))        #kHz
+        alphapII= (A2*P2*f2*f**2)/(f**2+f2**2) 
+        
+        #Part III: Sound absorption by Pure water CHECK
+        
+        if M1_Temp_hours[j,i] <= 20:
+            A3 = 4.937e-4 - 2.59e-5*M1_Temp_hours[j,i] + 9.11e-7*M1_Temp_hours[j,i]**2 - 1.5e-8*M1_Temp_hours[j,i]**3 
+        
+        if M1_Temp_hours[j,i] > 20:
+            A3 = 3.964e-4 - 1.146e-5*M1_Temp_hours[j,i] + 1.45e-7*M1_Temp_hours[j,i]**2 - 6.5e-10*M1_Temp_hours[j,i]**3
+            
+        P3 = 1.0 - 3.83e-5*M1depth[j]  + 4.9e-10*M1depth[j]**2 
+            
+        alphapIII= A3*P3*f**2
+        
+        #Total sound absorption CHECK
+        Sound_abs = alphapI + alphapII + alphapIII      #dB/km-1       
+
+        M1sound_abs[i,j]=Sound_abs
+    
+        #Determining time varying gain = Total acoustic loss
+        TVG=(20*np.log10(len(M1rangeADCP)-M1rangeADCP[j]+0.5))+(2*(Sound_abs)*((len(M1rangeADCP)-M1rangeADCP[j]+0.5)/1000)) # Sounds_abs = dB /m
+        
+        M1tvg[i,j]=TVG
+        
+        #Adding up acoustig loss to relative backscatterdata to give indication of actual backscatter value
+        M1backscatbeam1[i,j]=(M1backscatbeam1_rel2[i,j]+TVG)
+        M1backscatbeam2[i,j]=(M1backscatbeam2_rel2[i,j]+TVG)
+        M1backscatbeam3[i,j]=(M1backscatbeam3_rel2[i,j]+TVG)
+        M1backscatbeam4[i,j]=(M1backscatbeam4_rel2[i,j]+TVG)
+    
+        #Next loop    
+        j=j+1
+        
+    i=i+1
+
+#2.5.2 Mooring 2 - SAME NOTES AS MOORING 1
+#ADCP_M2_Depth=np.arange(0,len(M2depth),1)
+
+a=np.min(M2timeofmeasurementp)
+b=np.max(M2timeofmeasurementp)
+c=np.where(CTD_M2_time_hours==a)
+d=np.where(CTD_M2_time_hours==b)
+
+M2_Sal_hours=CTD_M2_Sal_hours[:,int(c[0]-1):int(d[0]+1)]
+M2_Temp_hours=CTD_M2_Temp_hours[:,int(c[0]-1):int(d[0]+1)]
+
+##Make data file & run loop
+M2sound_abs=np.zeros((len(M2timeofmeasurementp),int(M2DepthADCP)),dtype='float')
+M2tvg=np.zeros((len(M2timeofmeasurementp),int(M2DepthADCP)),dtype='float')
+M2backscatbeam1=np.zeros((len(M2backscatbeam1_rel1),int(M2DepthADCP)),dtype='float')
+M2backscatbeam2=np.zeros((len(M2backscatbeam2_rel1),int(M2DepthADCP)),dtype='float')
+M2backscatbeam3=np.zeros((len(M2backscatbeam3_rel1),int(M2DepthADCP)),dtype='float')
+M2backscatbeam4=np.zeros((len(M2backscatbeam4_rel1),int(M2DepthADCP)),dtype='float')
+      
+for i in range(len(M2timeofmeasurementp)):
+
+     for j in range(len(M2depth)):
+          #Part I: Sound absorption by boric acid -> CHECK
+         c = 1412 + 3.21*M2_Temp_hours[j,i] + 1.19*M2_Sal_hours[j,i] + 0.0167*M2depth[j]                   #Speed of sound (m/s)
+         A1 = (8.86 * (10**(0.78*pH - 5)))/ c                    #
+         f1 = (2.8 * np.sqrt(M2_Sal_hours[j,i]/35) )* (10**((4 - 1245)/(273+M2_Temp_hours[j,i])))           #unit= kHz
+         alphapI= (A1*1*f1*f**2)/(f1**2+f**2)                                                               #dB/km-1
+         
+         #Part II: Sound absorption by MgSO4
+         A2 = 21.44 * (M2_Sal_hours[j,i]/c) * (1 + 0.025 * M2_Temp_hours[j,i])                              # dB/km/kHz
+         P2 = 1 - 1.37e-4*M2depth[j]   + 6.2e-9*M2depth[j]   **2
+         f2 = (8.17 * 10 **((8 - 1990)/(273+M2_Temp_hours[j,i]))) / (1+0.0018*(M2_Sal_hours[j,i]-35))       #kHz
+         alphapII= (A2*P2*f2*f**2)/(f**2+f2**2)  
+         
+         #Part III: Sound absorption by Pure water
+         
+         if M2_Temp_hours[j,i] <= 20:
+             A3 = 4.937e-4 - 2.59e-5*M2_Temp_hours[j,i] + 9.11e-7*M2_Temp_hours[j,i]**2 - 1.5e-8*M2_Temp_hours[j,i]**3 
+         
+         if M2_Temp_hours[j,i] > 20:
+             A3 = 3.964e-4 - 1.146e-5*M2_Temp_hours[j,i] + 1.45e-7*M2_Temp_hours[j,i]**2 - 6.5e-10*M2_Temp_hours[j,i]**3
+             
+         P3 = 1.0 - 3.83e-5*M2depth[j]     + 4.9e-10*M2depth[j]**2 
+             
+         alphapIII= A3*P3*f**2
+         
+         #Total sound absorption
+         Sound_abs = alphapI + alphapII + alphapIII         #dB/km-1
+    
+         M2sound_abs[i,j]=Sound_abs
+         
+         #Determining time varying gain = Total acoustic loss
+         TVG=(20*np.log10(len(M2rangeADCP)-M2rangeADCP[j]+0.5))+(2*(Sound_abs/1000)*((len(M2rangeADCP)-M2rangeADCP[j]+0.5))) # Sounds_abs = dB /m
+         
+         M2tvg[i,j]=TVG
+         
+         #Adding up acoustig loss to relative backscatterdata to give indication of actual backscatter value
+         M2backscatbeam1[i,j]=(M2backscatbeam1_rel2[i,j]+TVG)
+         M2backscatbeam2[i,j]=(M2backscatbeam2_rel2[i,j]+TVG)
+         M2backscatbeam3[i,j]=(M2backscatbeam3_rel2[i,j]+TVG)
+         M2backscatbeam4[i,j]=(M2backscatbeam4_rel2[i,j]+TVG)
+         
+         j=j+1
+ 
+     #Next loop     
+     i=i+1
+
+
+# =============================================================================
+# plt.plot(M1tvg[2700,:],label='tvg')
+# plt.plot(M1backscatbeam1_rel2[2700,:], label='uncorrected')
+# plt.plot(M1backscatbeam1[2700,:],label='corrected')
+# plt.ylabel('tvg')
+# plt.xlabel('depth in meters')
+# plt.title('M1')
+# plt.legend()
+# 
+# plt.plot(M2tvg[2700,:],label='tvg')
+# plt.plot(M2backscatbeam1_rel2[2700,:], label='uncorrected')
+# plt.plot(M2backscatbeam1[2700,:],label='corrected')
+# plt.ylabel('tvg')
+# plt.xlabel('depth in meters')
+# plt.title('M2')
+# plt.legend()
+# 
+# =============================================================================
+
+## 2.6 TAKING OUT THE SEDIMENT TRAP__________________________________________________________________
+M1backscatbeam1[:,117:125]=np.nan
+M1backscatbeam2[:,117:125]=np.nan
+M1backscatbeam3[:,117:125]=np.nan
+M1backscatbeam4[:,117:125]=np.nan
+M1vup1[:,117:125]=np.nan
+M1vup2[:,117:125]=np.nan
+
+M2backscatbeam1[:,87:95]=np.nan
+M2backscatbeam2[:,87:95]=np.nan
+M2backscatbeam3[:,87:95]=np.nan
+M2backscatbeam4[:,87:95]=np.nan
+M2vup1[:,87:95]=np.nan
+M2vup2[:,87:95]=np.nan
+
+
+#2.7 Combining beams by determining the average between the four beams
+
+M1backscatall=np.zeros((len(M1backscatbeam1_rel1),int(M1DepthADCP)),dtype='float')
+
+for i in range(len(M1timeofmeasurementp)):
+    
+    for j in range(len(M1depth)):
+             
+        M1backscatall[i,j]=np.average([M1backscatbeam1[i,j],M1backscatbeam2[i,j],M1backscatbeam3[i,j],M1backscatbeam4[i,j]])
+        
+        j=j+1
+        
+    i=i+1
+
+M2backscatall=np.zeros((len(M2backscatbeam1_rel1),int(M2DepthADCP)),dtype='float')
+
+for i in range(len(M2timeofmeasurementp)):
+    
+    for j in range(len(M2depth)):
+             
+        M2backscatall[i,j]=np.average([M2backscatbeam1[i,j],M2backscatbeam2[i,j],M2backscatbeam3[i,j],M2backscatbeam4[i,j]])
+        
+        j=j+1
+        
+    i=i+1
+    
+#2.8 interpolate all the datasets
+a=pd.DataFrame(M1backscatall)
+M1backscatallint=a.interpolate(method='linear', axis='columns',limit_direction='both')
+#plt.plot(M1depth,a.iloc[4000,:],'bo', M1depth, M1backscatallint.iloc[4000,:],'r')    
+
+a=pd.DataFrame(M1vup1)
+M1vup1int=a.interpolate(method='linear', axis='columns',limit_direction='both')
+#plt.plot(M1depth,a.iloc[5000,:],'bo', M1depth, M1vup1int.iloc[5000,:],'r')    
+
+a=pd.DataFrame(M1vup2)
+M1vup2int=a.interpolate(method='linear', axis='columns',limit_direction='both')
+#plt.plot(M1depth,a.iloc[4000,:],'bo', M1depth, M1vup2int.iloc[4000,:],'r')    
+
+a=pd.DataFrame(M2backscatall)
+M2backscatallint=a.interpolate(method='linear', axis='columns',limit_direction='both')
+#plt.plot(M2depth,a.iloc[4000,:],'bo', M2depth, M2backscatallint.iloc[4000,:],'r')
+
+a=pd.DataFrame(M2vup1)
+M2vup1int=a.interpolate(method='linear', axis='columns',limit_direction='both')
+#plt.plot(M2depth,a.iloc[5000,:],'bo', M2depth, M2vup1int.iloc[5000,:],'r')    
+
+a=pd.DataFrame(M2vup2)
+M2vup2int=a.interpolate(method='linear', axis='columns',limit_direction='both')
+#plt.plot(M2depth,a.iloc[4000,:],'bo', M2depth, M2vup2int.iloc[4000,:],'r')    
+
+#2.9 FFT -> get the underlying signal out.
+numbersig=10
+
+#Mooring1 - backscat
+M1Backscatfftfreq=np.zeros((len(M1backscatallint.iloc[:,1]),len(M1backscatallint.iloc[1,:])),dtype='float')
+M1BackscatfftPSD=np.zeros((len(M1backscatallint.iloc[:,1]),len(M1backscatallint.iloc[1,:])),dtype='float')
+M1BackscatfftPSDclean=np.zeros((len(M1backscatallint.iloc[:,1]),len(M1backscatallint.iloc[1,:])),dtype='float')
+M1Backscatffilt=np.zeros((len(M1backscatallint.iloc[:,1]),len(M1backscatallint.iloc[1,:])),dtype='float')
+M1Backscatindices=np.zeros((len(M1backscatallint.iloc[:,1]),len(M1backscatallint.iloc[1,:])),dtype='float')
+M1Dominantcycles=np.zeros((numbersig,len(M1backscatallint.iloc[1,:])),float)
+
+for i in range(len(M1backscatallint.iloc[1,:])-1):
+
+    dt=1
+    n=len(M1timeofmeasurement)
+    fhat=np.fft.fft(M1backscatallint.iloc[:,i],n)
+    M1BackscatfftPSD[:,i]=(1/(dt*n))*np.conj(fhat)/n
+    M1Backscatfftfreq[:,i]=(24/(dt*n))*np.arange(n)
+    L=np.arange(1,np.floor(n/2),dtype='int')
+    
+    a=np.argpartition(M1BackscatfftPSD[:len(L),i], -numbersig)[-numbersig:]   
+    b=M1BackscatfftPSD[a,i]
+    M1Dominantcycles[:,i]=1/M1Backscatfftfreq[a,i]
+    #M1Dominantcycles[:,i].sort(axis=0)
+    
+    M1Backscatindices[:,i]=M1BackscatfftPSD[:,i]>np.min(b[np.nonzero(b)]) #NEED TO VARY THIS THROUGHOUT TIME #kill everything below 0.000060
+ 
+    M1BackscatfftPSDclean[:,i]=M1BackscatfftPSD[:,i]*M1Backscatindices[:,i]
+    fhat=M1Backscatindices[:,i]*fhat
+    M1Backscatffilt[:,i]=np.fft.ifft(fhat)
+
+    i=i+1
+
+#Mooring1 - vvel
+M1vvelfftfreq=np.zeros((len(M1backscatallint.iloc[:,1]),len(M1backscatallint.iloc[1,:])),dtype='float')
+M1vvelfftPSD=np.zeros((len(M1backscatallint.iloc[:,1]),len(M1backscatallint.iloc[1,:])),dtype='float')
+M1vvelfftPSDclean=np.zeros((len(M1backscatallint.iloc[:,1]),len(M1backscatallint.iloc[1,:])),dtype='float')
+M1vvelffilt=np.zeros((len(M1backscatallint.iloc[:,1]),len(M1backscatallint.iloc[1,:])),dtype='float')
+M1vvelindices=np.zeros((len(M1backscatallint.iloc[:,1]),len(M1backscatallint.iloc[1,:])),dtype='float')
+M1Dominantcyclesvvel=np.zeros((numbersig,len(M1backscatallint.iloc[1,:])),float)
+
+for i in range(len(M1backscatallint.iloc[1,:])-1):
+
+    dt=1
+    n=len(M1timeofmeasurement)
+    fhat=np.fft.fft(M1vup2int.iloc[:,i],n)
+    M1vvelfftPSD[:,i]=(1/(dt*n))*np.conj(fhat)/n
+    M1vvelfftfreq[:,i]=(24/(dt*n))*np.arange(n)
+    L=np.arange(1,np.floor(n/2),dtype='int')
+    
+    a=np.argpartition(M1vvelfftPSD[:len(L),i], -numbersig)[-numbersig:]   
+    b=M1vvelfftPSD[a,i]
+    M1Dominantcyclesvvel[:,i]=1/M1vvelfftfreq[a,i]
+    #M1Dominantcyclesvvel[:,i].sort(axis=0)
+    
+    M1vvelindices[:,i]=M1vvelfftPSD[:,i]>np.min(b[np.nonzero(b)]) #NEED TO VARY THIS THROUGHOUT TIME #kill everything below 0.000060
+ 
+    M1vvelfftPSDclean[:,i]=M1vvelfftPSD[:,i]*M1vvelindices[:,i]
+    fhat=M1vvelindices[:,i]*fhat
+    M1vvelffilt[:,i]=np.fft.ifft(fhat)
+
+    i=i+1
+
+
+#Mooring2 - backscat
+M2Backscatfftfreq=np.zeros((len(M2backscatallint.iloc[:,1]),len(M2backscatallint.iloc[1,:])),dtype='float')
+M2BackscatfftPSD=np.zeros((len(M2backscatallint.iloc[:,1]),len(M2backscatallint.iloc[1,:])),dtype='float')
+M2BackscatfftPSDclean=np.zeros((len(M2backscatallint.iloc[:,1]),len(M2backscatallint.iloc[1,:])),dtype='float')
+M2Backscatffilt=np.zeros((len(M2backscatallint.iloc[:,1]),len(M2backscatallint.iloc[1,:])),dtype='float')
+M2Backscatindices=np.zeros((len(M2backscatallint.iloc[:,1]),len(M2backscatallint.iloc[1,:])),dtype='float')
+M2Dominantcycles=np.zeros((numbersig,len(M2backscatallint.iloc[1,:])),float)
+
+for i in range(len(M2backscatallint.iloc[1,:])-1):
+
+    dt=1
+    n=len(M2timeofmeasurement)
+    fhat=np.fft.fft(M2backscatallint.iloc[:,i],n)
+    M2BackscatfftPSD[:,i]=(1/(dt*n))*np.conj(fhat)/n
+    M2Backscatfftfreq[:,i]=(24/(dt*n))*np.arange(n)
+    L=np.arange(1,np.floor(n/2),dtype='int')
+    
+    a=np.argpartition(M2BackscatfftPSD[:len(L),i], -numbersig)[-numbersig:]   
+    b=M2BackscatfftPSD[a,i]
+    M2Dominantcycles[:,i]=1/M2Backscatfftfreq[a,i]
+    #M2Dominantcycles[:,i].sort(axis=0)
+    
+    M2Backscatindices[:,i]=M2BackscatfftPSD[:,i]>np.min(b[np.nonzero(b)]) #NEED TO VARY THIS THROUGHOUT TIME #kill everything below 0.000060
+ 
+    M2BackscatfftPSDclean[:,i]=M2BackscatfftPSD[:,i]*M2Backscatindices[:,i]
+    fhat=M2Backscatindices[:,i]*fhat
+    M2Backscatffilt[:,i]=np.fft.ifft(fhat)
+
+    i=i+1
+    
+#Mooring2 - vvel
+M2vvelfftfreq=np.zeros((len(M2backscatallint.iloc[:,1]),len(M2backscatallint.iloc[1,:])),dtype='float')
+M2vvelfftPSD=np.zeros((len(M2backscatallint.iloc[:,1]),len(M2backscatallint.iloc[1,:])),dtype='float')
+M2vvelfftPSDclean=np.zeros((len(M2backscatallint.iloc[:,1]),len(M2backscatallint.iloc[1,:])),dtype='float')
+M2vvelffilt=np.zeros((len(M2backscatallint.iloc[:,1]),len(M2backscatallint.iloc[1,:])),dtype='float')
+M2vvelindices=np.zeros((len(M2backscatallint.iloc[:,1]),len(M2backscatallint.iloc[1,:])),dtype='float')
+M2Dominantcyclesvvel=np.zeros((numbersig,len(M2backscatallint.iloc[1,:])),float)
+
+for i in range(len(M2backscatallint.iloc[1,:])-1):
+
+    dt=1
+    n=len(M2timeofmeasurement)
+    fhat=np.fft.fft(M2vup2int.iloc[:,i],n)
+    M2vvelfftPSD[:,i]=(1/(dt*n))*np.conj(fhat)/n
+    M2vvelfftfreq[:,i]=(24/(dt*n))*np.arange(n)
+    L=np.arange(1,np.floor(n/2),dtype='int')
+    
+    a=np.argpartition(M2vvelfftPSD[:len(L),i], -numbersig)[-numbersig:]   
+    b=M2vvelfftPSD[a,i]
+    M2Dominantcyclesvvel[:,i]=1/M2vvelfftfreq[a,i]
+    #M2Dominantcyclesvvel[:,i].sort(axis=0)
+    
+    M2vvelindices[:,i]=M2vvelfftPSD[:,i]>np.min(b[np.nonzero(b)]) #NEED TO VARY THIS THROUGHOUT TIME #kill everything below 0.000060
+ 
+    M2vvelfftPSDclean[:,i]=M2vvelfftPSD[:,i]*M2vvelindices[:,i]
+    fhat=M2vvelindices[:,i]*fhat
+    M2vvelffilt[:,i]=np.fft.ifft(fhat)
+
+    i=i+1    
+
+#CHAPTER 3. MAKING THE DATA PRESENTABLE_______________________________________________
+
+#3.1 FILTER
+#Make new datasets for lowpassed data    
+
+#6h
+dt=1                            #Sampling interval of timeseries (hours)
+cutoff=6                      #Cut off period (hours) (low-pass (lp) > 24-36h removes tides + inertial oscillations)
+order=2                         #order of filter (here, a Butterworth filter use order=2 or order=4 (higher=stronger damping))
+nyq=1/2/dt                      #Nyquist frequency (1/hours)
+Wn=1/cutoff/nyq                 #filter coefficient
+
+[b,a]=scipy.signal.butter(order,Wn,'lowpass')
+
+M1_Backscat_lowpass6h=np.zeros((len(M1backscatall[:,1]),len(M1backscatall[1,:])),dtype='float')
+M1_vvel1_lowpass6h=np.zeros((len(M1backscatall[:,1]),len(M1backscatall[1,:])),dtype='float')
+M1_vvel2_lowpass6h=np.zeros((len(M1backscatall[:,1]),len(M1backscatall[1,:])),dtype='float')
+
+for i in range(len(M1backscatall[1,:])):
+       
+    M1_Backscat_lowpass6h[:,i]=sig.lfilter(b,a,M1backscatallint.iloc[:,i])
+    M1_vvel1_lowpass6h[:,i]=sig.lfilter(b,a,M1vup1int.iloc[:,i])
+    M1_vvel2_lowpass6h[:,i]=sig.lfilter(b,a,M1vup2int.iloc[:,i])
+
+    i=i+1
+      
+M2_Backscat_lowpass6h=np.zeros((len(M2backscatall[:,1]),len(M2backscatall[1,:])),dtype='float')
+M2_vvel1_lowpass6h=np.zeros((len(M2backscatall[:,1]),len(M2backscatall[1,:])),dtype='float')
+M2_vvel2_lowpass6h=np.zeros((len(M2backscatall[:,1]),len(M2backscatall[1,:])),dtype='float')
+
+for i in range(len(M2backscatall[1,:])):
+    
+    M2_Backscat_lowpass6h[:,i]=sig.lfilter(b,a,M2backscatallint.iloc[:,i])
+    M2_vvel1_lowpass6h[:,i]=sig.lfilter(b,a,M2vup1int.iloc[:,i])
+    M2_vvel2_lowpass6h[:,i]=sig.lfilter(b,a,M2vup2int.iloc[:,i])
+
+    i=i+1
+
+#12h
+dt=1                            #Sampling interval of timeseries (hours)
+cutoff=12                      #Cut off period (hours) (low-pass (lp) > 24-36h removes tides + inertial oscillations)
+order=2                         #order of filter (here, a Butterworth filter use order=2 or order=4 (higher=stronger damping))
+nyq=1/2/dt                      #Nyquist frequency (1/hours)
+Wn=1/cutoff/nyq                 #filter coefficient
+
+[b,a]=scipy.signal.butter(order,Wn,'lowpass')
+
+M1_Backscat_lowpass12h=np.zeros((len(M1backscatall[:,1]),len(M1backscatall[1,:])),dtype='float')
+M1_vvel1_lowpass12h=np.zeros((len(M1backscatall[:,1]),len(M1backscatall[1,:])),dtype='float')
+M1_vvel2_lowpass12h=np.zeros((len(M1backscatall[:,1]),len(M1backscatall[1,:])),dtype='float')
+
+for i in range(len(M1backscatall[1,:])):
+       
+    M1_Backscat_lowpass12h[:,i]=sig.lfilter(b,a,M1backscatallint.iloc[:,i])
+    M1_vvel1_lowpass12h[:,i]=sig.lfilter(b,a,M1vup1int.iloc[:,i])
+    M1_vvel2_lowpass12h[:,i]=sig.lfilter(b,a,M1vup2int.iloc[:,i])
+
+    i=i+1
+      
+M2_Backscat_lowpass12h=np.zeros((len(M2backscatall[:,1]),len(M2backscatall[1,:])),dtype='float')
+M2_vvel1_lowpass12h=np.zeros((len(M2backscatall[:,1]),len(M2backscatall[1,:])),dtype='float')
+M2_vvel2_lowpass12h=np.zeros((len(M2backscatall[:,1]),len(M2backscatall[1,:])),dtype='float')
+
+for i in range(len(M2backscatall[1,:])):
+    
+    M2_Backscat_lowpass12h[:,i]=sig.lfilter(b,a,M2backscatallint.iloc[:,i])
+    M2_vvel1_lowpass12h[:,i]=sig.lfilter(b,a,M2vup1int.iloc[:,i])
+    M2_vvel2_lowpass12h[:,i]=sig.lfilter(b,a,M2vup2int.iloc[:,i])
+
+    i=i+1
+
+#24h
+dt=1                            #Sampling interval of timeseries (hours)
+cutoff=24                       #Cut off period (hours) (low-pass (lp) > 24-36h removes tides + inertial oscillations)
+order=2                         #order of filter (here, a Butterworth filter use order=2 or order=4 (higher=stronger damping))
+nyq=1/2/dt                      #Nyquist frequency (1/hours)
+Wn=1/cutoff/nyq                 #filter coefficient
+
+[b,a]=scipy.signal.butter(order,Wn,'lowpass')
+
+M1_Backscat_lowpass24h=np.zeros((len(M1backscatall[:,1]),len(M1backscatall[1,:])),dtype='float')
+M1_vvel1_lowpass24h=np.zeros((len(M1backscatall[:,1]),len(M1backscatall[1,:])),dtype='float')
+M1_vvel2_lowpass24h=np.zeros((len(M1backscatall[:,1]),len(M1backscatall[1,:])),dtype='float')
+
+for i in range(len(M1backscatall[1,:])):
+       
+    M1_Backscat_lowpass24h[:,i]=sig.lfilter(b,a,M1backscatallint.iloc[:,i])
+    M1_vvel1_lowpass24h[:,i]=sig.lfilter(b,a,M1vup1int.iloc[:,i])
+    M1_vvel2_lowpass24h[:,i]=sig.lfilter(b,a,M1vup2int.iloc[:,i])
+
+    i=i+1
+      
+M2_Backscat_lowpass24h=np.zeros((len(M2backscatall[:,1]),len(M2backscatall[1,:])),dtype='float')
+M2_vvel1_lowpass24h=np.zeros((len(M2backscatall[:,1]),len(M2backscatall[1,:])),dtype='float')
+M2_vvel2_lowpass24h=np.zeros((len(M2backscatall[:,1]),len(M2backscatall[1,:])),dtype='float')
+
+for i in range(len(M2backscatall[1,:])):
+    
+    M2_Backscat_lowpass24h[:,i]=sig.lfilter(b,a,M2backscatallint.iloc[:,i])
+    M2_vvel1_lowpass24h[:,i]=sig.lfilter(b,a,M2vup1int.iloc[:,i])
+    M2_vvel2_lowpass24h[:,i]=sig.lfilter(b,a,M2vup2int.iloc[:,i])
+
+    i=i+1
+
+#90d
+dt=1                            #Sampling interval of timeseries (hours)
+cutoff=24*90                       #Cut off period (hours) (low-pass (lp) > 24-36h removes tides + inertial oscillations)
+order=2                         #order of filter (here, a Butterworth filter use order=2 or order=4 (higher=stronger damping))
+nyq=1/2/dt                      #Nyquist frequency (1/hours)
+Wn=1/cutoff/nyq                 #filter coefficient
+
+[b,a]=scipy.signal.butter(order,Wn,'lowpass')
+
+M1_Backscat_lowpass90d=np.zeros((len(M1backscatall[:,1]),len(M1backscatall[1,:])),dtype='float')
+M1_vvel1_lowpass90d=np.zeros((len(M1backscatall[:,1]),len(M1backscatall[1,:])),dtype='float')
+M1_vvel2_lowpass90d=np.zeros((len(M1backscatall[:,1]),len(M1backscatall[1,:])),dtype='float')
+
+for i in range(len(M1backscatall[1,:])):
+       
+    M1_Backscat_lowpass90d[:,i]=sig.lfilter(b,a,M1backscatallint.iloc[:,i])
+    M1_vvel1_lowpass90d[:,i]=sig.lfilter(b,a,M1vup1int.iloc[:,i])
+    M1_vvel2_lowpass90d[:,i]=sig.lfilter(b,a,M1vup2int.iloc[:,i])
+
+    i=i+1
+      
+M2_Backscat_lowpass90d=np.zeros((len(M2backscatall[:,1]),len(M2backscatall[1,:])),dtype='float')
+M2_vvel1_lowpass90d=np.zeros((len(M2backscatall[:,1]),len(M2backscatall[1,:])),dtype='float')
+M2_vvel2_lowpass90d=np.zeros((len(M2backscatall[:,1]),len(M2backscatall[1,:])),dtype='float')
+
+for i in range(len(M2backscatall[1,:])):
+    
+    M2_Backscat_lowpass90d[:,i]=sig.lfilter(b,a,M2backscatallint.iloc[:,i])
+    M2_vvel1_lowpass90d[:,i]=sig.lfilter(b,a,M2vup1int.iloc[:,i])
+    M2_vvel2_lowpass90d[:,i]=sig.lfilter(b,a,M2vup2int.iloc[:,i])
+
+    i=i+1
+
+##############################################################################
+#Bandpass filter
+#M1
+dt=1            
+nyq=1/2/dt
+order=2
+
+#0.5 day
+M1Backscatffilt05d=np.zeros((len(M1backscatallint.iloc[:,1]),len(M1backscatallint.iloc[1,:])),dtype='float')
+
+lowcut=0.45*24   ; low=1/lowcut/nyq     #cutoff frequency in half hours
+highcut=0.55*24  ; high=1/highcut/nyq
+
+[b,a]=scipy.signal.butter(order,[low,high],'bandpass',analog=False)
+
+for i in range(len(M1backscatallint.iloc[1,:])):
+       
+    M1Backscatffilt05d[:,i]=sig.lfilter(b,a,M1backscatallint.iloc[:,i])
+
+    i=i+1
+
+
+#1 day
+M1Backscatffilt1d=np.zeros((len(M1backscatallint.iloc[:,1]),len(M1backscatallint.iloc[1,:])),dtype='float')
+
+lowcut=0.95*24   ; low=1/lowcut/nyq     #cutoff frequency in half hours
+highcut=1.05*24  ; high=1/highcut/nyq
+
+[b,a]=scipy.signal.butter(order,[low,high],'bandpass',analog=False)
+
+for i in range(len(M1backscatallint.iloc[1,:])):
+       
+    M1Backscatffilt1d[:,i]=sig.lfilter(b,a,M1backscatallint.iloc[:,i])
+
+    i=i+1
+
+#1-10 days
+M1Backscatffilt110d=np.zeros((len(M1backscatallint.iloc[:,1]),len(M1backscatallint.iloc[1,:])),dtype='float')
+
+lowcut=1*24   ; low=1/lowcut/nyq
+highcut=10*24  ; high=1/highcut/nyq
+
+[b,a]=scipy.signal.butter(order,[low,high],'bandpass',analog=False)
+
+for i in range(len(M1backscatallint.iloc[1,:])):
+       
+    M1Backscatffilt110d[:,i]=sig.lfilter(b,a,M1backscatallint.iloc[:,i])
+
+    i=i+1
+
+#10-20 days
+M1Backscatffilt1020d=np.zeros((len(M1backscatallint.iloc[:,1]),len(M1backscatallint.iloc[1,:])),dtype='float')
+
+lowcut=10*24   ; low=1/lowcut/nyq
+highcut=20*24  ; high=1/highcut/nyq
+
+[b,a]=scipy.signal.butter(order,[low,high],'bandpass',analog=False)
+
+for i in range(len(M1backscatallint.iloc[1,:])):
+       
+    M1Backscatffilt1020d[:,i]=sig.lfilter(b,a,M1backscatallint.iloc[:,i])
+
+    i=i+1
+
+#28-30 days
+M1Backscatffilt2830d=np.zeros((len(M1backscatallint.iloc[:,1]),len(M1backscatallint.iloc[1,:])),dtype='float')
+
+lowcut=28*24   ; low=1/lowcut/nyq
+highcut=30*24  ; high=1/highcut/nyq
+
+[b,a]=scipy.signal.butter(order,[low,high],'bandpass',analog=False)
+
+for i in range(len(M1backscatallint.iloc[1,:])):
+       
+    M1Backscatffilt2830d[:,i]=sig.lfilter(b,a,M1backscatallint.iloc[:,i])
+
+    i=i+1
+
+#80-30
+M1Backscatffilt3080d=np.zeros((len(M1backscatallint.iloc[:,1]),len(M1backscatallint.iloc[1,:])),dtype='float')
+
+lowcut=30*24   ; low=1/lowcut/nyq
+highcut=80*24  ; high=1/highcut/nyq
+
+[b,a]=scipy.signal.butter(order,[low,high],'bandpass',analog=False)
+
+for i in range(len(M1backscatallint.iloc[1,:])):
+       
+    M1Backscatffilt3080d[:,i]=sig.lfilter(b,a,M1backscatallint.iloc[:,i])
+
+    i=i+1
+
+#80-96 days
+M1Backscatffilt8096d=np.zeros((len(M1backscatallint.iloc[:,1]),len(M1backscatallint.iloc[1,:])),dtype='float')
+
+lowcut=80*24   ; low=1/lowcut/nyq
+highcut=96*24  ; high=1/highcut/nyq
+
+[b,a]=scipy.signal.butter(order,[low,high],'bandpass',analog=False)
+
+for i in range(len(M1backscatallint.iloc[1,:])):
+       
+    M1Backscatffilt8096d[:,i]=sig.lfilter(b,a,M1backscatallint.iloc[:,i])
+
+    i=i+1
+
+#160-194 days
+M1Backscatffilt164d=np.zeros((len(M1backscatallint.iloc[:,1]),len(M1backscatallint.iloc[1,:])),dtype='float')
+
+lowcut=160*24  ; low=1/lowcut/nyq
+highcut=194*24  ; high=1/highcut/nyq
+
+[b,a]=scipy.signal.butter(order,[low,high],'bandpass',analog=False)
+
+for i in range(len(M1backscatallint.iloc[1,:])):
+       
+    M1Backscatffilt164d[:,i]=sig.lfilter(b,a,M1backscatallint.iloc[:,i])
+
+    i=i+1
+
+#320 days
+M1Backscatffilt320d=np.zeros((len(M1backscatallint.iloc[:,1]),len(M1backscatallint.iloc[1,:])),dtype='float')
+
+lowcut=300*24 ; low=1/lowcut/nyq
+highcut=400*24  ; high=1/highcut/nyq
+
+[b,a]=scipy.signal.butter(order,[low,high],'bandpass',analog=False)
+
+for i in range(len(M1backscatallint.iloc[1,:])):
+       
+    M1Backscatffilt320d[:,i]=sig.lfilter(b,a,M1backscatallint.iloc[:,i])
+
+    i=i+1
+
+
+#M2
+dt=1            
+nyq=1/2/dt
+order=2
+
+#0.5 day
+M2Backscatffilt05d=np.zeros((len(M2backscatallint.iloc[:,1]),len(M2backscatallint.iloc[1,:])),dtype='float')
+
+lowcut=0.45*24   ; low=1/lowcut/nyq     #cutoff frequency in half hours
+highcut=0.55*24  ; high=1/highcut/nyq
+
+[b,a]=scipy.signal.butter(order,[low,high],'bandpass',analog=False)
+
+for i in range(len(M2backscatallint.iloc[1,:])):
+       
+    M2Backscatffilt05d[:,i]=sig.lfilter(b,a,M2backscatallint.iloc[:,i])
+
+    i=i+1
+
+
+#1 day
+M2Backscatffilt1d=np.zeros((len(M2backscatallint.iloc[:,1]),len(M2backscatallint.iloc[1,:])),dtype='float')
+
+lowcut=0.95*24   ; low=1/lowcut/nyq     #cutoff frequency in half hours
+highcut=1.05*24  ; high=1/highcut/nyq
+
+[b,a]=scipy.signal.butter(order,[low,high],'bandpass',analog=False)
+
+for i in range(len(M2backscatallint.iloc[1,:])):
+       
+    M2Backscatffilt1d[:,i]=sig.lfilter(b,a,M2backscatallint.iloc[:,i])
+
+    i=i+1
+
+#1-10 days
+M2Backscatffilt110d=np.zeros((len(M2backscatallint.iloc[:,1]),len(M2backscatallint.iloc[1,:])),dtype='float')
+
+lowcut=1*24   ; low=1/lowcut/nyq
+highcut=10*24  ; high=1/highcut/nyq
+
+[b,a]=scipy.signal.butter(order,[low,high],'bandpass',analog=False)
+
+for i in range(len(M2backscatallint.iloc[1,:])):
+       
+    M2Backscatffilt110d[:,i]=sig.lfilter(b,a,M2backscatallint.iloc[:,i])
+
+    i=i+1
+
+#10-20 days
+M2Backscatffilt1020d=np.zeros((len(M2backscatallint.iloc[:,1]),len(M2backscatallint.iloc[1,:])),dtype='float')
+
+lowcut=10*24   ; low=1/lowcut/nyq
+highcut=20*24  ; high=1/highcut/nyq
+
+[b,a]=scipy.signal.butter(order,[low,high],'bandpass',analog=False)
+
+for i in range(len(M2backscatallint.iloc[1,:])):
+       
+    M2Backscatffilt1020d[:,i]=sig.lfilter(b,a,M2backscatallint.iloc[:,i])
+
+    i=i+1
+
+#28-30 days
+M2Backscatffilt2830d=np.zeros((len(M2backscatallint.iloc[:,1]),len(M2backscatallint.iloc[1,:])),dtype='float')
+
+lowcut=28*24   ; low=1/lowcut/nyq
+highcut=30*24  ; high=1/highcut/nyq
+
+[b,a]=scipy.signal.butter(order,[low,high],'bandpass',analog=False)
+
+for i in range(len(M2backscatallint.iloc[1,:])):
+       
+    M2Backscatffilt2830d[:,i]=sig.lfilter(b,a,M2backscatallint.iloc[:,i])
+
+    i=i+1
+
+#80-30
+M2Backscatffilt3080d=np.zeros((len(M2backscatallint.iloc[:,1]),len(M2backscatallint.iloc[1,:])),dtype='float')
+
+lowcut=30*24   ; low=1/lowcut/nyq
+highcut=80*24  ; high=1/highcut/nyq
+
+[b,a]=scipy.signal.butter(order,[low,high],'bandpass',analog=False)
+
+for i in range(len(M2backscatallint.iloc[1,:])):
+       
+    M2Backscatffilt3080d[:,i]=sig.lfilter(b,a,M2backscatallint.iloc[:,i])
+
+    i=i+1
+
+#80-96 days
+M2Backscatffilt8096d=np.zeros((len(M2backscatallint.iloc[:,1]),len(M2backscatallint.iloc[1,:])),dtype='float')
+
+lowcut=80*24   ; low=1/lowcut/nyq
+highcut=96*24  ; high=1/highcut/nyq
+
+[b,a]=scipy.signal.butter(order,[low,high],'bandpass',analog=False)
+
+for i in range(len(M2backscatallint.iloc[1,:])):
+       
+    M2Backscatffilt8096d[:,i]=sig.lfilter(b,a,M2backscatallint.iloc[:,i])
+
+    i=i+1
+
+#160-194 days
+M2Backscatffilt164d=np.zeros((len(M2backscatallint.iloc[:,1]),len(M2backscatallint.iloc[1,:])),dtype='float')
+
+lowcut=160*24 ; low=1/lowcut/nyq
+highcut=194*24  ; high=1/highcut/nyq
+
+[b,a]=scipy.signal.butter(order,[low,high],'bandpass',analog=False)
+
+for i in range(len(M2backscatallint.iloc[1,:])):
+       
+    M2Backscatffilt164d[:,i]=sig.lfilter(b,a,M2backscatallint.iloc[:,i])
+
+    i=i+1
+
+#320 days
+M2Backscatffilt320d=np.zeros((len(M2backscatallint.iloc[:,1]),len(M2backscatallint.iloc[1,:])),dtype='float')
+
+lowcut=300*24 ; low=1/lowcut/nyq
+highcut=400*24  ; high=1/highcut/nyq
+
+[b,a]=scipy.signal.butter(order,[low,high],'bandpass',analog=False)
+
+for i in range(len(M2backscatallint.iloc[1,:])):
+       
+    M2Backscatffilt320d[:,i]=sig.lfilter(b,a,M2backscatallint.iloc[:,i])
+
+    i=i+1
+
+#3.2 Vertical velocity anomaly    
+# =============================================================================
+# #The Doppler vertical velocity data showed a bias
+# towards downward movement when values were averaged
+# over all depths. This bias was deducted from the
+# data to give the ‘Doppler vertical velocity anomaly’,
+# which is a better representation of the
+# actual upward and downward migrations
+# of the scatterers.
+# =============================================================================
+#Look at this with the Plueddemann and Pinkel 1989 paper.
+M1vup1ano=M1vup1-np.nanmean(M1_vvel1_lowpass6h)
+M1vup2ano=M1vup2-np.nanmean(M1_vvel2_lowpass6h)
+
+M2vup1ano=M2vup1-np.nanmean(M2_vvel1_lowpass6h)
+M2vup2ano=M2vup2-np.nanmean(M2_vvel2_lowpass6h)
+
+
+#3.3 ADCP backscatter & vertical velocity model day of each week + vertical velocity anomaly
+
+#Mooring 1
+
+#Combine measured backscatter of each week into one 'weekday' do this for every week.
+M1Weeks=np.zeros((int(len(M2backscatall)/(24*7)+1),2),dtype='datetime64[h]')
+
+
+#Make weeks for Mooring 1 
+M1Starttime=M1timeofmeasurement[1]     # 12 o clock midday
+M1Endtime=M1timeofmeasurement[7478]    # 12 o clock midday
+
+for i in range(len(M1Weeks)):                             #Mark beginning and end of each week.
+
+    M1Weeks[i,0]=np.datetime64(M1Starttime)+np.timedelta64(i,'W')
+    M1Weeks[i,1]=np.datetime64(M1Starttime)+np.timedelta64(i+1,'W')-np.timedelta64(1,'h')
+ 
+    i=i+1
+
+#Sort ADCP backscatter and vertical velocity data in weeks    
+M1backscatweek= {}
+M1velup1ano={}
+M1velup2ano={}
+
+for i in range(len(M1Weeks)-1):
+
+    start=np.where(M1timeofmeasurement==M1Weeks[i,0])
+    end=np.where(M1timeofmeasurement==M1Weeks[i,1])
+    M1backscatweek[i]=M1_Backscat_lowpass6h[int(start[0]):int(end[0]),:]
+    M1velup1ano[i]=M1vup1[int(start[0]):int(end[0]),:]
+    M1velup2ano[i]=M1vup2[int(start[0]):int(end[0]),:]
+    
+    i=i+1
+
+# Make model day by averiging 9am for 6 days, 10am, etc. to have a 24 average where an everage 24h is visible.
+hours=np.arange(0,24,1)
+M16dav={}
+M16dvup1={}
+M16dvup2={}
+
+for j in range (len(M1Weeks)-1):
+             
+        avbackscatday=np.zeros((len(M1backscatall[1,:]),len(hours)),dtype='float')
+        avvelup1day=np.zeros((len(M1backscatall[1,:]),len(hours)),dtype='float')
+        avvelup2day=np.zeros((len(M1backscatall[1,:]),len(hours)),dtype='float')
+   
+        for i in range(len(hours)):
+            
+                
+            if i <=22:      
+                houraverage=((M1velup1ano[j][i+0*24,:]+
+                              M1velup1ano[j][i+1*24,:]+
+                              M1velup1ano[j][i+2*24,:]+
+                              M1velup1ano[j][i+3*24,:]+
+                              M1velup1ano[j][i+4*24,:]+
+                              M1velup1ano[j][i+5*24,:]+
+                              M1velup1ano[j][i+6*24,:])/7)
+                avvelup1day[:,i]=houraverage
+                houraverage=((M1velup2ano[j][i+0*24,:]+
+                               M1velup2ano[j][i+1*24,:]+
+                               M1velup2ano[j][i+2*24,:]+
+                               M1velup2ano[j][i+3*24,:]+
+                               M1velup2ano[j][i+4*24,:]+
+                               M1velup2ano[j][i+5*24,:]+
+                               M1velup2ano[j][i+6*24,:])/7)
+                avvelup2day[:,i]=houraverage                
+                houraverage=((M1backscatweek[j][i+0*24,:]+
+                              M1backscatweek[j][i+1*24,:]+
+                              M1backscatweek[j][i+2*24,:]+
+                              M1backscatweek[j][i+3*24,:]+
+                              M1backscatweek[j][i+4*24,:]+
+                              M1backscatweek[j][i+5*24,:]+
+                              M1backscatweek[j][i+6*24,:])/7)
+                avbackscatday[:,i]=houraverage                
+                
+            else:
+                houraverage=((M1velup1ano[j][i+0*24,:]+
+                              M1velup1ano[j][i+1*24,:]+
+                              M1velup1ano[j][i+2*24,:]+
+                              M1velup1ano[j][i+3*24,:]+
+                              M1velup1ano[j][i+4*24,:]+
+                              M1velup1ano[j][i+5*24,:])/6)
+                avvelup1day[:,i]=houraverage
+                houraverage=((M1velup2ano[j][i+0*24,:]+
+                               M1velup2ano[j][i+1*24,:]+
+                               M1velup2ano[j][i+2*24,:]+
+                               M1velup2ano[j][i+3*24,:]+
+                               M1velup2ano[j][i+4*24,:]+
+                               M1velup2ano[j][i+5*24,:])/6)
+                avvelup2day[:,i]=houraverage                
+                houraverage=((M1backscatweek[j][i+0*24,:]+
+                              M1backscatweek[j][i+1*24,:]+
+                              M1backscatweek[j][i+2*24,:]+
+                              M1backscatweek[j][i+3*24,:]+
+                              M1backscatweek[j][i+4*24,:]+
+                              M1backscatweek[j][i+5*24,:])/6)
+                avbackscatday[:,i]=houraverage                
+                
+            i=i+1
+            
+        M16dvup1[j]=avvelup1day
+        M16dvup2[j]=avvelup2day          
+        M16dav[j]=avbackscatday
+  
+        j=j+1
+
+#Mooring 2
+#Combine measured backscatter of each week into one 'weekday' do this for every week.
+M2Weeks=np.zeros((int(len(M2backscatall)/(24*7)+1),2),dtype='datetime64[h]')
+
+#Make weeks for Mooring 2 
+M2Starttime=M2timeofmeasurement[20]     # 12 o clock midday
+M2Endtime=M2timeofmeasurement[7461]
+Week1=np.zeros((24*7+1,len(M2backscatall[1,:])),dtype='float')
+
+for i in range(len(M2Weeks)):                             #Mark beginning and end of each week.
+
+    M2Weeks[i,0]=np.datetime64(M2Starttime)+np.timedelta64(i,'W')
+    M2Weeks[i,1]=np.datetime64(M2Starttime)+np.timedelta64(i+1,'W')-np.timedelta64(1,'h')
+
+    i=i+1
+    
+#Sort ADCP backscatter and vertical velocity data in weeks
+M2backscatweek= {}
+M2velup1ano={}
+M2velup2ano={}
+
+for i in range(len(M2Weeks)-1):
+
+    start=np.where(M2timeofmeasurement==M2Weeks[i,0])
+    end=np.where(M2timeofmeasurement==M2Weeks[i,1])
+    M2backscatweek[i]=M2_Backscat_lowpass6h[int(start[0]):int(end[0]),:]
+    M2velup1ano[i]=M2vup1[int(start[0]):int(end[0]),:]
+    M2velup2ano[i]=M2vup2[int(start[0]):int(end[0]),:]
+
+    a=np.nanmean(M2velup1ano[i])
+    if a <0: M2velup1ano[i]=M2velup1ano[i]+abs(a) 
+    else: M2velup1ano[i]=M2velup1ano[i]-abs(a)
+
+    b=np.nanmean(M2velup2ano[i])
+    if b <0: M2velup2ano[i]=M2velup2ano[i]+abs(b) 
+    else: M2velup2ano[i]=M2velup2ano[i]-abs(b)
+
+    i=i+1
+
+# Make model day by averiging 9am for 6 days, 10am, etc. to have a 24 average where an everage 24h is visible.
+hours=np.arange(0,24,1)
+M26dav={}
+M26dvup1={}
+M26dvup2={}
+
+for j in range (len(M2Weeks)-1):
+             
+        avbackscatday=np.zeros((len(M2backscatall[1,:]),len(hours)),dtype='float')
+        avvelup1day=np.zeros((len(M2backscatall[1,:]),len(hours)),dtype='float')
+        avvelup2day=np.zeros((len(M2backscatall[1,:]),len(hours)),dtype='float')
+   
+        for i in range(len(hours)):
+            
+                
+            if i <=22:      
+                houraverage=((M2velup1ano[j][i+0*24,:]+
+                              M2velup1ano[j][i+1*24,:]+
+                              M2velup1ano[j][i+2*24,:]+
+                              M2velup1ano[j][i+3*24,:]+
+                              M2velup1ano[j][i+4*24,:]+
+                              M2velup1ano[j][i+5*24,:]+
+                              M2velup1ano[j][i+6*24,:])/7)
+                avvelup1day[:,i]=houraverage
+                houraverage=((M2velup2ano[j][i+0*24,:]+
+                               M2velup2ano[j][i+1*24,:]+
+                               M2velup2ano[j][i+2*24,:]+
+                               M2velup2ano[j][i+3*24,:]+
+                               M2velup2ano[j][i+4*24,:]+
+                               M2velup2ano[j][i+5*24,:]+
+                               M2velup2ano[j][i+6*24,:])/7)
+                avvelup2day[:,i]=houraverage                
+                houraverage=((M2backscatweek[j][i+0*24,:]+
+                              M2backscatweek[j][i+1*24,:]+
+                              M2backscatweek[j][i+2*24,:]+
+                              M2backscatweek[j][i+3*24,:]+
+                              M2backscatweek[j][i+4*24,:]+
+                              M2backscatweek[j][i+5*24,:]+
+                              M2backscatweek[j][i+6*24,:])/7)
+                avbackscatday[:,i]=houraverage                
+                
+            else:
+                houraverage=((M2velup1ano[j][i+0*24,:]+
+                              M2velup1ano[j][i+1*24,:]+
+                              M2velup1ano[j][i+2*24,:]+
+                              M2velup1ano[j][i+3*24,:]+
+                              M2velup1ano[j][i+4*24,:]+
+                              M2velup1ano[j][i+5*24,:])/6)
+                avvelup1day[:,i]=houraverage
+                houraverage=((M2velup2ano[j][i+0*24,:]+
+                               M2velup2ano[j][i+1*24,:]+
+                               M2velup2ano[j][i+2*24,:]+
+                               M2velup2ano[j][i+3*24,:]+
+                               M2velup2ano[j][i+4*24,:]+
+                               M2velup2ano[j][i+5*24,:])/6)
+                avvelup2day[:,i]=houraverage                
+                houraverage=((M2backscatweek[j][i+0*24,:]+
+                              M2backscatweek[j][i+1*24,:]+
+                              M2backscatweek[j][i+2*24,:]+
+                              M2backscatweek[j][i+3*24,:]+
+                              M2backscatweek[j][i+4*24,:]+
+                              M2backscatweek[j][i+5*24,:])/6)
+                avbackscatday[:,i]=houraverage                
+                
+            i=i+1
+                  
+        M26dvup1[j]=avvelup1day
+        M26dvup2[j]=avvelup2day          
+        M26dav[j]=avbackscatday
+  
+        j=j+1
+
+plt.plot(M1tvg[1,:])
+plt.plot(M2tvg[1,:])
+
+#Distribution plots -> colourschemes come from here.
+# =============================================================================
+# seaborn.displot(M1backscatall[:,0:163],binwidth=5, legend=False)
+# seaborn.displot(M1backscatallint.iloc[:,20:163],binwidth=10,legend=False)
+# seaborn.displot(M1vup1[:,0:163], binwidth=0.01, legend=False)
+# seaborn.displot(M1vup1ano[:,0:163], binwidth=0.01, legend=False)
+# seaborn.displot(M1vup1int.iloc[:,0:163],binwidth=0.01, legend=False)
+# seaborn.displot(M1_vvel1_lowpass[:,0:163],binwidth=0.01, legend=False)
+# 
+# seaborn.displot(M2backscatall[:,0:143],binwidth=5, legend=False)
+# seaborn.displot(M2backscatallint.iloc[:,20:143],binwidth=10, legend=False)
+# seaborn.displot(M2vup1[:,0:163], binwidth=0.01, legend=False)
+# seaborn.displot(M2vup1ano[:,0:163], binwidth=0.01, legend=False)
+# seaborn.displot(M2vup1int.iloc[:,0:163],binwidth=0.01, legend=False)
+# seaborn.displot(M2_vvel1_lowpass[:,0:163],binwidth=0.01, legend=False)
+# 
+# seaborn.displot(M1_Sal_hours,binwidth=0.05, legend=False)
+# seaborn.displot(M1_Temp_hours[:,1],binwidth=0.05, legend=False)
+# 
+# =============================================================================
+
+#Bins
+#Vvel ->        <-0.10 / -0.05 / -0.01/0/0.01/0.05/0.10>
+#Backscat ->    <70/70-80/80-90/90-100/100-110/110-120/120>
+
+#3. EXPORT DATA
+Kaldfjorden={       'ADCP_M1_backscat_6dav':M16dav,
+                    'ADCP_M1_backscat_lp6h':M1_Backscat_lowpass6h,
+                    'ADCP_M1_backscat_lp12h':M1_Backscat_lowpass12h,
+                    'ADCP_M1_backscat_lp24h':M1_Backscat_lowpass24h,
+                    'ADCP_M1_backscat_lp90d':M1_Backscat_lowpass90d,
+                    'ADCP_M1backscatfilt_10p':M1Backscatffilt,
+                    'ADCP_M1dominantcycles':M1Dominantcycles,
+                    'ADCP_M1backscatallint':M1backscatallint,
+                    'ADCP_M1backscatbeam1':M1backscatbeam1,
+                    'ADCP_M1backscatbeam2':M1backscatbeam2,
+                    'ADCP_M1backscatbeam3':M1backscatbeam3,
+                    'ADCP_M1backscatbeam4':M1backscatbeam4,
+                    'ADCP_M1Backscatfilt05d':M1Backscatffilt05d,
+                    'ADCP_M1Backscatfilt1d':M1Backscatffilt1d,
+                    'ADCP_M1Backscatfilt1-10d':M1Backscatffilt110d,
+                    'ADCP_M1Backscatfilt10-20d':M1Backscatffilt1020d,
+                    'ADCP_M1Backscatfilt28-30d':M1Backscatffilt2830d,
+                    'ADCP_M1Backscatfilt30-80dd':M1Backscatffilt3080d,
+                    'ADCP_M1Backscatfilt80-96d':M1Backscatffilt8096d,
+                    'ADCP_M1Backscatfilt164d':M1Backscatffilt164d,
+                    'ADCP_M1Backscatfilt320d':M1Backscatffilt320d,
+                    'ADCP_M1depth':M1depth,
+                    'ADCP_M1depthADCP':M1DepthADCP,
+                    'ADCP_M1timeofmeasurement':M1timeofmeasurement,
+                    'M1_Temperature':M1temperature,
+                    'M1_Weeks':M1Weeks,
+                    'ADCP_M1vup1_lp6h':M1_vvel1_lowpass6h,
+                    'ADCP_M1vup2_lp6h':M1_vvel2_lowpass6h,      
+                    'ADCP_M1vup1_lp12h':M1_vvel1_lowpass12h,
+                    'ADCP_M1vup2_lp12h':M1_vvel2_lowpass12h,      
+                    'ADCP_M1vup1_lp24h':M1_vvel1_lowpass24h,
+                    'ADCP_M1vup2_lp24h':M1_vvel2_lowpass24h,      
+                    'ADCP_M1vup1_lp90d':M1_vvel1_lowpass90d,
+                    'ADCP_M1vup2_lp90d':M1_vvel2_lowpass90d,
+                    'ADCP_M1vvelfilt_10p':M1vvelffilt, 
+                    'ADCP_M1dominantcyclesvvel':M1Dominantcyclesvvel,
+                    'ADCP_M1vup1_ano_6dav':M16dvup1,
+                    'ADCP_M1vup2_ano_6dav':M16dvup2,
+                    'M1_Density':M1_Density,
+                    'CTD_M1_Sal':M1_Sal_hours,
+                    'CTD_M1_Temp':M1_Temp_hours,
+                    'ST_M1_TPM':M1tpm,
+                    'ST_M1_POC':M1poc,
+                    'ST_M1_Chlorofylla':M1chl,
+                    'ST_M1_phyplankton':M1phy,
+                    'ST_M1_zooplankton':M1zoo,                  
+                    'ADCP_M2_backscat_6dav':M26dav,
+                    'ADCP_M2backscatallint':M2backscatallint,
+                    'ADCP_M2_backscat_lp6h':M2_Backscat_lowpass6h,
+                    'ADCP_M2_backscat_lp12h':M2_Backscat_lowpass12h,
+                    'ADCP_M2_backscat_lp24h':M2_Backscat_lowpass24h,
+                    'ADCP_M2_backscat_lp90d':M2_Backscat_lowpass90d,
+                    'ADCP_M2backscatfilt_10p':M2Backscatffilt,
+                    'ADCP_M2dominantcycles':M2Dominantcycles,
+                    'ADCP_M2backscatbeam1':M2backscatbeam1,
+                    'ADCP_M2backscatbeam2':M2backscatbeam2,
+                    'ADCP_M2backscatbeam3':M2backscatbeam3,
+                    'ADCP_M2backscatbeam4':M2backscatbeam4,
+                    'ADCP_M2Backscatfilt05d':M2Backscatffilt05d,
+                    'ADCP_M2Backscatfilt1d':M2Backscatffilt1d,
+                    'ADCP_M2Backscatfilt1-10d':M2Backscatffilt110d,
+                    'ADCP_M2Backscatfilt10-20d':M2Backscatffilt1020d,
+                    'ADCP_M2Backscatfilt28-30d':M2Backscatffilt2830d,
+                    'ADCP_M2Backscatfilt30-80dd':M2Backscatffilt3080d,
+                    'ADCP_M2Backscatfilt80-96d':M2Backscatffilt8096d,
+                    'ADCP_M2Backscatfilt164d':M2Backscatffilt164d,
+                    'ADCP_M2Backscatfilt320d':M2Backscatffilt320d,
+                    'ADCP_M2depth':M2depth,
+                    'ADCP_M2timeofmeasurement':M2timeofmeasurement,
+                    'M2_Temperature':M2temperature,
+                    'M2_Weeks':M2Weeks,
+                    'M2_Density':M2_Density,
+                    'ADCP_M2depthACP':M2DepthADCP,
+                    'ADCP_M2vup1_lp6h':M2_vvel1_lowpass6h,
+                    'ADCP_M2vup2_lp6h':M2_vvel2_lowpass6h,      
+                    'ADCP_M2vup1_lp12h':M2_vvel1_lowpass12h,
+                    'ADCP_M2vup2_lp12h':M2_vvel2_lowpass12h,      
+                    'ADCP_M2vup1_lp24h':M2_vvel1_lowpass24h,
+                    'ADCP_M2vup2_lp24h':M2_vvel2_lowpass24h,      
+                    'ADCP_M2vup1_lp90d':M2_vvel1_lowpass90d,
+                    'ADCP_M2vup2_lp90d':M2_vvel2_lowpass90d,      
+                    'ADCP_M2vvelfilt_10p':M2vvelffilt, 
+                    'ADCP_M2dominantcyclesvvel':M2Dominantcyclesvvel,
+                    'ADCP_M2vup1_ano_6dav':M26dvup1,
+                    'ADCP_M2vup2_ano_6dav':M26dvup2,
+                    'CTD_M2_Sal':M2_Sal_hours,
+                    'CTD_M2_Temp':M2_Temp_hours,
+                    'ST_M2_TPM':M2tpm,
+                    'ST_M2_POC':M2poc,
+                    'ST_M2_Chlorofylla':M2chl,
+                    'ST_M2_phyplankton':M2phy,
+                    'ST_M2_zooplankton':M2zoo,               
+                    } #Make dictionary of everything I want to export
+pickle_out=open('Kaldfjorden clean ADCP data','wb') #Make Pickle file that stores this data named 'ADCP data Kaldfjorden clean'
+pickle.dump(Kaldfjorden,pickle_out)
+pickle_out.close()
