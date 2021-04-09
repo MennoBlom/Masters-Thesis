@@ -6,20 +6,22 @@
 #       CTD
 #       Sedimenttrap
 # 2. Data cleaning
-#   2.1 Covert time from MATLAB to Python language
-#   2.2 All data to same sampling period
-#   2.3 Error filter (Correlation is still there but turned off)
-#   2.4 Vertical movement filter ADCP
-#   2.5 Determination TVG
-#   2.6 Taking out sediment trap in data
-#   2.7 Combining beams
-#   2.8 Interpolation
-#   2.9 Fast Forier Transformation -> what patterns visible?
+#   2.1 Take sediment trap out 
+#   2.2 Covert time from MATLAB to Python language
+#   2.3 Align all data on same time, and depth interval
+#   2.4 Correlation & Error filter
+#   2.5 Vertical movement filter ADCP
+#   2.6 Determination TVG
+#   2.7 Taking out sediment trap in data
+#   2.8 Combining beams
+#   2.9 Interpolation
+#   2.10 Fast Forier Transformation -> what patterns visible?
 # 3. Making data presentable
-#   3.1 Filters, lowpassed, bandpass filter.
-#   3.2 Vertical velocity anomaly
-#   3.3 Model days of ADCP backscatter & vertical velocity
-# Export cleaned data as 'ADCP data Kaldfjorden clean'
+#   3.1 Filters, low,-bandpass filter.
+#   3.2 Model days of ADCP backscatter & vertical velocity
+# 4. Density calculation
+# 5. Export cleaned data as 'ADCP data Kaldfjorden clean'
+
 
 #IMPORT packages
 import scipy.io
@@ -50,7 +52,7 @@ import seaborn
 Mooring1= scipy.io.loadmat('WHALE_ADCP_T1.mat')
 Mooring2= scipy.io.loadmat('WHALE_ADCP_T2.mat')
 
-#Extract data Mooring 1 (M1) from dictionary given a certain range to aacount for surface, beginning and end of measurement
+##Extract data Mooring 1 (M1) from dictionary given a certain range to aacount for surface, beginning and end of measurement
 M1backscatbeam1_rel1=Mooring1['amp1'][15:7502,0:76]                         #Unit: dB (acc= 0.5dB/count)
 M1backscatbeam2_rel1=Mooring1['amp2'][15:7502,0:76]                         #Unit: dB (acc= 0.5dB/count)
 M1backscatbeam3_rel1=Mooring1['amp3'][15:7502,0:76]                         #Unit: dB (acc= 0.5dB/count)
@@ -61,7 +63,6 @@ M1correlationbeam3=Mooring1['corr3'][15:7502,0:76]                          #Uni
 M1correlationbeam4=Mooring1['corr4'][15:7502,0:76]                          #Unit: % Difference inside and outside water (acc = 0-100)
 M1error=Mooring1['error'][15:7502,0:76]                                     #Unit: Binar; I assumes it gives an error code when there is an error at a certain ping
 M1headingrel=Mooring1['heading'][15:7502,0:76]                              #Unit: Degrees (acc=0.01 deg)
-#M1numberofbeams=(Mooring1['nbeams'])                                       #Unit: #
 M1pitch=Mooring1['pitch'][15:7502,0:76]                                     #Unit: Degrees (acc=0.01 deg)
 M1pressure=Mooring1['pr'][15:7502,0:76]                                     #Unit: dBAR (acc=0.001 dBar) pressure on first moment in time
 M1pressure_array=Mooring1['pr_array'][15:7502,0:76]                         #?? Unit: dBAR 
@@ -70,24 +71,15 @@ M1roll=Mooring1['roll'][15:7502,0:76]                                       #Uni
 M1timeofmeasurement=Mooring1['t'][15:7502,0:76]                             #Unit: ... #Measurments per day (13/day, every 2hours?)
 M1dayindication=(Mooring1['t_1d'])                                          #Unit: ... #Code for each day
 M1temperature=Mooring1['temp'][15:7502,0:76]                                #Unit: Celsius (acc= 0.01 C)
-#M1velocityeastX=(Mooring1['vele'])                                         #Unit: m/s
-#M1velocityeastX_filt=(Mooring1['vele_filt'])                               #Unit: m/s filtered out the small patterns to give a nicer image on large scale
-#M1velocityeastX_filt_1d=(Mooring1['vele_filt_1d'])                         #Unit: m/s averaged out the velocities per day 
-#M1velocityeastX_reg=(Mooring1['vele_reg'])                                 #Unit: m/s reg=remapped grid, pulled flat the water line        
-#M1velocitynorthY=(Mooring1['veln'])                                        #Unit: m/s
-#M1velocitynorthY_filt=(Mooring1['veln_filt'])                              #Unit: m/s filtered out the small patterns to give a nicer image on large scale
-#M1velocitynorthY_filt_1d=(Mooring1['veln_filt_1d'])                        #Unit: m/s averaged out the velocities per day
-#M1velocitynorthY_reg=(Mooring1['veln_reg'])                                #Unit: m/s reg=remapped grid, pulled flat the water line
 M1velocityupZ1=Mooring1['velup1'][15:7502,0:76]                             #Unit: m/s
 M1velocityupZ2=Mooring1['velup2'][15:7502,0:76]                             #Unit: m/s
-
 ##Mooring 1 Specific parameters
 M1DepthADCP=np.average(gsw.z_from_p(np.delete(M1pressure,np.where(M1pressure<=100)),69+46.814/60))*-1   #Depth from ADCP unit=m - depth from ADCP.
 M1binsADCP=np.arange(0,76,1)                                                                            #Length bin = 2m.
 M1rangeADCP=np.arange(0,M1DepthADCP,1)
 M1depth=np.arange(0,int(M1DepthADCP),1)
 
-#Extract data Mooring 2 (M2) from dictionary
+##Extract data Mooring 2 (M2) from dictionary given a certain range to aacount for surface, beginning and end of measurement
 M2backscatbeam1_rel1=Mooring2['amp1'][18:7500,0:63]                         #Unit: dB (acc= 0.5dB/count)      
 M2backscatbeam2_rel1=Mooring2['amp2'][18:7500,0:63]                         #Unit: dB (acc= 0.5dB/count)
 M2backscatbeam3_rel1=Mooring2['amp3'][18:7500,0:63]                         #Unit: dB (acc= 0.5dB/count)
@@ -98,7 +90,6 @@ M2correlationbeam3=Mooring2['corr3'][18:7500,0:63]                          #Uni
 M2correlationbeam4=Mooring2['corr4'][18:7500,0:63]                          #Unit: % Difference inside and outside water (acc = 0-100)
 M2error=Mooring2['error'][18:7500,0:63]                                     #Unit: Binar; I assumes it gives an error code when there is an error at a certain ping
 M2headingrel=Mooring2['heading'][18:7500,0:63]                              #Unit: Degrees (acc=0.01 deg)
-#M2numberofbeams=(Mooring2['nbeams'])                                       #Unit: #
 M2pitch=Mooring2['pitch'][18:7500,0:63]                                     #Unit: Degrees (acc=0.01 deg)
 M2pressure=Mooring2['pr'][18:7500,0:63]                                     #Unit: dBAR (acc=0.001 dBar) pressure on first moment in time
 M2pressure_array=Mooring2['pr_array'][18:7500,0:63]                         #?? Unit: dBAR 
@@ -107,48 +98,13 @@ M2roll=Mooring2['roll'][18:7500,0:63]                                       #Uni
 M2timeofmeasurement=Mooring2['t'][18:7500,0:63]                             #Unit: ... #Measurments per day (13/day, every 2hours?)
 M2dayindication=(Mooring2['t_1d'])                                          #Unit: ... #Code for each day
 M2temperature=Mooring2['temp'][18:7500,0:63]                                #Unit: Celsius (acc= 0.01 C)
-#M2velocityeastX=(Mooring2['vele'])                                         #Unit: m/s
-#M2velocityeastX_filt=(Mooring2['vele_filt'])                               #Unit: m/s filtered out the small patterns to give a nicer image on large scale
-#M2velocityeastX_filt_1d=(Mooring2['vele_filt_1d'])                         #Unit: m/s averaged out the velocities per day 
-#M2velocityeastX_reg=(Mooring2['vele_reg'])                                 #Unit: m/s reg=remapped grid, pulled flat the water line        
-#M2velocitynorthY=(Mooring2['veln'])                                        #Unit: m/s
-#M2velocitynorthY_filt=(Mooring2['veln_filt'])                              #Unit: m/s filtered out the small patterns to give a nicer image on large scale
-#M2velocitynorthY_filt_1d=(Mooring2['veln_filt_1d'])                        #Unit: m/s averaged out the velocities per day
-#M2velocitynorthY_reg=(Mooring2['veln_reg'])                                #Unit: m/s reg=remapped grid, pulled flat the water line
 M2velocityupZ1=Mooring2['velup1'][18:7500,0:63]                             #Unit: m/s
 M2velocityupZ2=Mooring2['velup2'][18:7500,0:63]                             #Unit: m/s 
-
 ##Mooring 2 specific parameters
 M2DepthADCP=np.average(gsw.z_from_p(np.delete(M2pressure,np.where(M2pressure<=100)),69+46.814/60))*-1
 M2binsADCP=np.arange(0,63,1)
 M2rangeADCP=np.arange(0,M2DepthADCP,1)
 M2depth=np.arange(0,int(M2DepthADCP),1)
-
-
-#Take sediment trap out of mooring 1
-M1backscatbeam1_rel1[0:2,21:23]=np.nan
-M1backscatbeam2_rel1[0:2,21:23]=np.nan
-M1backscatbeam3_rel1[0:2,21:23]=np.nan
-M1backscatbeam4_rel1[0:2,21:23]=np.nan
-M1correlationbeam1[0:2,21:23]=np.nan
-M1correlationbeam2[0:2,21:23]=np.nan
-M1correlationbeam3[0:2,21:23]=np.nan
-M1correlationbeam4[0:2,21:23]=np.nan
-M1velocityupZ1[0:2,21:23]=np.nan
-M1velocityupZ2[0:2,21:23]=np.nan
-
-#Take sediment trap out of mooring 2
-M2backscatbeam1_rel1[0:2,24]=np.nan
-M2backscatbeam2_rel1[0:2,24]=np.nan
-M2backscatbeam3_rel1[0:2,24]=np.nan
-M2backscatbeam4_rel1[0:2,24]=np.nan
-M2correlationbeam1[0:2,24]=np.nan
-M2correlationbeam2[0:2,24]=np.nan
-M2correlationbeam3[0:2,24]=np.nan
-M2correlationbeam4[0:2,24]=np.nan
-M2velocityupZ1[0:2,24]=np.nan
-M2velocityupZ2[0:2,24]=np.nan
-
 
 #Data Kaldfjorden_CTD dataset and extract Salinity, Temperature and Pressure data
 basectd=datetime.datetime(2017,9,7)         #Starttime CTD measurement
@@ -190,9 +146,34 @@ bzoo=df['Zooplankton Swimmers']
 
 #CHAPTER 2: KALDFJORDEN DATA CLEANING___________________________________________________________________________
 
-#2.1 GENERAL Convert MATLAB datenum to Python datetime____________________________________________________________
+#2.1 Take sediment trap out of measurements
+#Take sediment trap out of mooring 1
+M1backscatbeam1_rel1[0:2,21:23]=np.nan
+M1backscatbeam2_rel1[0:2,21:23]=np.nan
+M1backscatbeam3_rel1[0:2,21:23]=np.nan
+M1backscatbeam4_rel1[0:2,21:23]=np.nan
+M1correlationbeam1[0:2,21:23]=np.nan
+M1correlationbeam2[0:2,21:23]=np.nan
+M1correlationbeam3[0:2,21:23]=np.nan
+M1correlationbeam4[0:2,21:23]=np.nan
+M1velocityupZ1[0:2,21:23]=np.nan
+M1velocityupZ2[0:2,21:23]=np.nan
 
-#2.1.1 Mooring 1
+#Take sediment trap out of mooring 2
+M2backscatbeam1_rel1[0:2,24]=np.nan
+M2backscatbeam2_rel1[0:2,24]=np.nan
+M2backscatbeam3_rel1[0:2,24]=np.nan
+M2backscatbeam4_rel1[0:2,24]=np.nan
+M2correlationbeam1[0:2,24]=np.nan
+M2correlationbeam2[0:2,24]=np.nan
+M2correlationbeam3[0:2,24]=np.nan
+M2correlationbeam4[0:2,24]=np.nan
+M2velocityupZ1[0:2,24]=np.nan
+M2velocityupZ2[0:2,24]=np.nan
+
+#2.2 GENERAL Convert MATLAB datenum to Python datetime____________________________________________________________
+
+#2.2.1 Mooring 1
 
 ##Time each measurement
 M1timeofmeasurementp=np.zeros(((len(M1timeofmeasurement)),1),dtype='datetime64[h]') #Make array with datetime64 type cells, h is unit
@@ -220,7 +201,7 @@ for i in range(320):                                                            
     
     i=i+1
   
-#2.1.2 Mooring 2
+#2.2.2 Mooring 2
 
 ##Time each measurement
 M2timeofmeasurementp=np.zeros(((len(M2timeofmeasurement)),1),dtype='datetime64[h]') 
@@ -247,7 +228,7 @@ for i in range(320):
     
     i=i+1
 
-#2.2 PUT ALL DATA ON THE SAME SAMPLING PERIOD
+#2.3 ALIGN ALL DATA ON SAME TIME, AND DEPTH INTERVAL
 
 ##Sediment trap measurements monthly to hourly    
 M1timeofmeasurement=pd.to_datetime(M1timeofmeasurementp[:,0],format='%H:%M %d/%m/%Y')
@@ -453,9 +434,10 @@ for i in range(len(CTD_M2_Sal_hours[:,1])):
 
     i=i+1 
     
-#2.3 Error - When error code, total measurement out, correlation is still there but taken out -> can indicate fish____________
 
-#2.2.1 Mooring 1
+#2.4 Correlation & Error
+
+#2.4.1 Mooring 1
 for i in range(len(M1timeofmeasurementp)):          #per unit of time
     
     for j in range(len(M1binsADCP)):                #each bin depth
@@ -492,7 +474,7 @@ for i in range(len(M1timeofmeasurementp)):          #per unit of time
     
     i=i+1
 
-#2.2.2 Mooring 2
+#2.4.2 Mooring 2
 for i in range(len(M2timeofmeasurementp)):
     
     for j in range(len(M2binsADCP)):
@@ -528,10 +510,8 @@ for i in range(len(M2timeofmeasurementp)):
         M2backscatbeam4_rel1[i,:]=np.nan
     
     i=i+1
- 
-    
-    
-#2.4 TAKING OUT THE MOVEMENT OF THE ADCP_____________________________________________________________________________________________________________________
+     
+#2.5 TAKING OUT THE MOVEMENT OF THE ADCP_____________________________________________________________________________________________________________________
 
 #Make dataarrays
 M1backscatbeam1_rel2=np.zeros((len(M1timeofmeasurementp),int(M1DepthADCP)),dtype='float')
@@ -654,46 +634,7 @@ for i in range(len(M2timeofmeasurementp)):
 #CHECK plt.plot(M2pressure_array[15,:],M2velocityupZ2[15,:], 'bo', M2depth[1,:], M2vup2[15,:], 'r')
 
 
-#Density
-M1_Density=np.zeros((len(M1depth),len(M1timeofmeasurementp)),dtype='float')
-M2_Density=np.zeros((len(M2depth),len(M2timeofmeasurementp)),dtype='float')
-
-a=np.min(M1timeofmeasurementp)         #First measurement of ADCP 
-b=np.max(M1timeofmeasurementp)         #Last measurement of ADCP 
-c=np.where(CTD_M1_time_hours==a)       #Row of CTD measurement where ADCP made its FIRST measurement
-d=np.where(CTD_M1_time_hours==b)       #Row of CTD measurement where ADCP made its LAST measurement
-
-for i in range(len(M1depth)):
-    
-    for j in range(len(M1timeofmeasurementp)):
-        
-        e=gsw.density.rho_t_exact(CTD_M1_Sal_hours[i,c[0]+j],CTD_M1_Temp_hours[i,int(c[0]+j)],M1pressure_hours[j,i])
-
-        M1_Density[i,j]=e
-        
-        j=j+1
-        
-    i=i+1
-    
-    
-a=np.min(M2timeofmeasurementp)         #First measurement of ADCP 
-b=np.max(M2timeofmeasurementp)         #Last measurement of ADCP 
-c=np.where(CTD_M2_time_hours==a)       #Row of CTD measurement where ADCP made its FIRST measurement
-d=np.where(CTD_M2_time_hours==b)       #Row of CTD measurement where ADCP made its LAST measurement
-
-for i in range(len(M2depth)):
-    
-    for j in range(len(M2timeofmeasurementp)):
-        
-        e=gsw.density.rho_t_exact(CTD_M2_Sal_hours[i,c[0]+j],CTD_M2_Temp_hours[i,int(c[0]+j)],M2pressure_hours[j,i])
-
-        M2_Density[i,j]=e
-        
-        j=j+1
-        
-    i=i+1
-
-#2.5 DETERMINING DEGREDATION OF SIGNAL OVER DISTANCE FROM AND TOWARDS ADCPs (TIME VARIED GAIN)______________________________________
+#2.6 DETERMINING DEGREDATION OF SIGNAL OVER DISTANCE FROM AND TOWARDS ADCPs (TIME VARIED GAIN)______________________________________
 
 #f(ADCP)= 250Hz...The Francois & Garrison, 1982 formula is used because it is suitable for a sound frequency 
 #range of 200 Hz to 1MH. In seawater sound is absorbed by 3 parts, together forming the total sound absorption
@@ -703,8 +644,7 @@ for i in range(len(M2depth)):
 pH= 7   #Acidity unit: scale 1(acid) - 14(base) 
 f=250 #Frequency sound signal ADCP, unit: kHz
 
-#2.4.1 Mooring 1
-#ADCP_M1_Depth=np.arange(0,len(M1depth),1)
+#2.6.1 Mooring 1
 
 a=np.min(M1timeofmeasurementp)         #First measurement of ADCP 
 b=np.max(M1timeofmeasurementp)         #Last measurement of ADCP 
@@ -777,9 +717,7 @@ for i in range(len(M1timeofmeasurementp)):  #Within that loop do for each week
         
     i=i+1
 
-#2.5.2 Mooring 2 - SAME NOTES AS MOORING 1
-#ADCP_M2_Depth=np.arange(0,len(M2depth),1)
-
+#2.6.2 Mooring 2 - SAME NOTES AS MOORING 1
 a=np.min(M2timeofmeasurementp)
 b=np.max(M2timeofmeasurementp)
 c=np.where(CTD_M2_time_hours==a)
@@ -864,23 +802,7 @@ for i in range(len(M2timeofmeasurementp)):
 # 
 # =============================================================================
 
-## 2.6 TAKING OUT THE SEDIMENT TRAP__________________________________________________________________
-M1backscatbeam1[:,117:125]=np.nan
-M1backscatbeam2[:,117:125]=np.nan
-M1backscatbeam3[:,117:125]=np.nan
-M1backscatbeam4[:,117:125]=np.nan
-M1vup1[:,117:125]=np.nan
-M1vup2[:,117:125]=np.nan
-
-M2backscatbeam1[:,87:95]=np.nan
-M2backscatbeam2[:,87:95]=np.nan
-M2backscatbeam3[:,87:95]=np.nan
-M2backscatbeam4[:,87:95]=np.nan
-M2vup1[:,87:95]=np.nan
-M2vup2[:,87:95]=np.nan
-
-
-#2.7 Combining beams by determining the average between the four beams
+#2.8 Combining beams by determining the average between the four beams
 
 M1backscatall=np.zeros((len(M1backscatbeam1_rel1),int(M1DepthADCP)),dtype='float')
 
@@ -906,7 +828,7 @@ for i in range(len(M2timeofmeasurementp)):
         
     i=i+1
     
-#2.8 interpolate all the datasets
+#2.9 interpolate all the datasets
 a=pd.DataFrame(M1backscatall)
 M1backscatallint=a.interpolate(method='linear', axis='columns',limit_direction='both')
 #plt.plot(M1depth,a.iloc[4000,:],'bo', M1depth, M1backscatallint.iloc[4000,:],'r')    
@@ -931,7 +853,7 @@ a=pd.DataFrame(M2vup2)
 M2vup2int=a.interpolate(method='linear', axis='columns',limit_direction='both')
 #plt.plot(M2depth,a.iloc[4000,:],'bo', M2depth, M2vup2int.iloc[4000,:],'r')    
 
-#2.9 FFT -> get the underlying signal out.
+#2.10 FFT -> get the underlying signal out.
 numbersig=10
 
 #Mooring1 - backscat
@@ -1326,7 +1248,6 @@ for i in range(len(M1backscatallint.iloc[1,:])):
 
     i=i+1
 
-
 #M2
 dt=1            
 nyq=1/2/dt
@@ -1459,25 +1380,7 @@ for i in range(len(M2backscatallint.iloc[1,:])):
 
     i=i+1
 
-#3.2 Vertical velocity anomaly    
-# =============================================================================
-# #The Doppler vertical velocity data showed a bias
-# towards downward movement when values were averaged
-# over all depths. This bias was deducted from the
-# data to give the ‘Doppler vertical velocity anomaly’,
-# which is a better representation of the
-# actual upward and downward migrations
-# of the scatterers.
-# =============================================================================
-#Look at this with the Plueddemann and Pinkel 1989 paper.
-M1vup1ano=M1vup1-np.nanmean(M1_vvel1_lowpass6h)
-M1vup2ano=M1vup2-np.nanmean(M1_vvel2_lowpass6h)
-
-M2vup1ano=M2vup1-np.nanmean(M2_vvel1_lowpass6h)
-M2vup2ano=M2vup2-np.nanmean(M2_vvel2_lowpass6h)
-
-
-#3.3 ADCP backscatter & vertical velocity model day of each week + vertical velocity anomaly
+#3.2 ADCP backscatter & vertical velocity model day of each week + vertical velocity anomaly
 
 #Mooring 1
 
@@ -1697,6 +1600,46 @@ for j in range (len(M2Weeks)-1):
 plt.plot(M1tvg[1,:])
 plt.plot(M2tvg[1,:])
 
+#4. Potential density computation
+M1_Density=np.zeros((len(M1depth),len(M1timeofmeasurementp)),dtype='float')
+M2_Density=np.zeros((len(M2depth),len(M2timeofmeasurementp)),dtype='float')
+
+a=np.min(M1timeofmeasurementp)         #First measurement of ADCP 
+b=np.max(M1timeofmeasurementp)         #Last measurement of ADCP 
+c=np.where(CTD_M1_time_hours==a)       #Row of CTD measurement where ADCP made its FIRST measurement
+d=np.where(CTD_M1_time_hours==b)       #Row of CTD measurement where ADCP made its LAST measurement
+
+for i in range(len(M1depth)):
+    
+    for j in range(len(M1timeofmeasurementp)):
+        
+        e=gsw.density.rho_t_exact(CTD_M1_Sal_hours[i,c[0]+j],CTD_M1_Temp_hours[i,int(c[0]+j)],M1pressure_hours[j,i])
+
+        M1_Density[i,j]=e
+        
+        j=j+1
+        
+    i=i+1
+    
+    
+a=np.min(M2timeofmeasurementp)         #First measurement of ADCP 
+b=np.max(M2timeofmeasurementp)         #Last measurement of ADCP 
+c=np.where(CTD_M2_time_hours==a)       #Row of CTD measurement where ADCP made its FIRST measurement
+d=np.where(CTD_M2_time_hours==b)       #Row of CTD measurement where ADCP made its LAST measurement
+
+for i in range(len(M2depth)):
+    
+    for j in range(len(M2timeofmeasurementp)):
+        
+        e=gsw.density.rho_t_exact(CTD_M2_Sal_hours[i,c[0]+j],CTD_M2_Temp_hours[i,int(c[0]+j)],M2pressure_hours[j,i])
+
+        M2_Density[i,j]=e
+        
+        j=j+1
+        
+    i=i+1
+
+
 #Distribution plots -> colourschemes come from here.
 # =============================================================================
 # seaborn.displot(M1backscatall[:,0:163],binwidth=5, legend=False)
@@ -1722,7 +1665,7 @@ plt.plot(M2tvg[1,:])
 #Vvel ->        <-0.10 / -0.05 / -0.01/0/0.01/0.05/0.10>
 #Backscat ->    <70/70-80/80-90/90-100/100-110/110-120/120>
 
-#3. EXPORT DATA
+#5. EXPORT DATA
 Kaldfjorden={       'ADCP_M1_backscat_6dav':M16dav,
                     'ADCP_M1_backscat_lp6h':M1_Backscat_lowpass6h,
                     'ADCP_M1_backscat_lp12h':M1_Backscat_lowpass12h,
