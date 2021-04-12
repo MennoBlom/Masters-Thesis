@@ -1,4 +1,4 @@
-
+#Import packages
 import scipy.io
 import scipy.interpolate
 import scipy.stats
@@ -19,22 +19,14 @@ import cmocean
 import decimal
 from sklearn.linear_model import LinearRegression
 
-#Import clean ADCP data
 Kaldfjordencleandata=pickle.load(open("Kaldfjorden clean ADCP data", "rb"))
 
+#Import clean ADCP data M1
 M1backscat_6dav=Kaldfjordencleandata['ADCP_M1_backscat_6dav']
 M1backscat_lp6h=Kaldfjordencleandata['ADCP_M1_backscat_lp6h']
 M1backscat_lp12h=Kaldfjordencleandata['ADCP_M1_backscat_lp12h']
 M1backscat_lp24h=Kaldfjordencleandata['ADCP_M1_backscat_lp24h']
 M1backscat_lp90d=Kaldfjordencleandata['ADCP_M1_backscat_lp90d']
-a=Kaldfjordencleandata['ADCP_M1backscatfilt_10p']
-a[:,:20]=np.nan
-M1Backscatffilt=((a-np.nanmin(np.nanmin(a)))/(np.nanmax(np.nanmax(a))-np.nanmin(np.nanmin(a))))
-
-a=Kaldfjordencleandata['ADCP_M1backscatallint']
-a.iloc[:,:20]=np.nan
-M1backscatallint=((a-np.min(np.min(a)))/(np.max(np.max(a))-np.min(np.min(a))))
-
 M1Dominantcycles=Kaldfjordencleandata['ADCP_M1dominantcycles']
 #M1backscatbeam1=Kaldfjordencleandata['ADCP_M1backscatbeam1']
 #M1backscatbeam2=Kaldfjordencleandata['ADCP_M1backscatbeam2']
@@ -74,21 +66,21 @@ M1zoo=Kaldfjordencleandata['ST_M1_zooplankton']
 M1tempADCP=Kaldfjordencleandata['M1_Temperature']
 M1Weeks=Kaldfjordencleandata['M1_Weeks']
 
+##Import normalized backscatter
+a=Kaldfjordencleandata['ADCP_M1backscatfilt_10p']
+a[:,:20]=np.nan
+M1Backscatffilt=((a-np.nanmin(np.nanmin(a)))/(np.nanmax(np.nanmax(a))-np.nanmin(np.nanmin(a))))
+
+a=Kaldfjordencleandata['ADCP_M1backscatallint']
+a.iloc[:,:20]=np.nan
+M1backscatallint=((a-np.min(np.min(a)))/(np.max(np.max(a))-np.min(np.min(a))))
+
+#Import clean ADCP data M2
 M2backscat_6dav=Kaldfjordencleandata['ADCP_M2_backscat_6dav']
 M2backscat_lp6h=Kaldfjordencleandata['ADCP_M2_backscat_lp6h']
 M2backscat_lp12h=Kaldfjordencleandata['ADCP_M2_backscat_lp12h']
 M2backscat_lp24h=Kaldfjordencleandata['ADCP_M2_backscat_lp24h']
 M2backscat_lp90d=Kaldfjordencleandata['ADCP_M2_backscat_lp90d']
-a=Kaldfjordencleandata['ADCP_M2backscatfilt_10p']
-a[:,:20]=np.nan
-M2Backscatffilt=((a-np.nanmin(np.nanmin(a)))/(np.nanmax(np.nanmax(a))-np.nanmin(np.nanmin(a))))
-
-
-a=Kaldfjordencleandata['ADCP_M2backscatallint']
-a[a>120]=np.nan
-a.iloc[:,:20]=np.nan
-M2backscatallint=((a-np.min(np.min(a)))/(np.max(np.max(a))-np.min(np.min(a))))
-
 M2Dominantcycles=Kaldfjordencleandata['ADCP_M2dominantcycles']
 #M2backscatbeam1=Kaldfjordencleandata['ADCP_M2backscatbeam1']
 #M2backscatbeam2=Kaldfjordencleandata['ADCP_M2backscatbeam2']
@@ -128,10 +120,15 @@ M2zoo=Kaldfjordencleandata['ST_M2_zooplankton']
 M2tempADCP=Kaldfjordencleandata['M2_Temperature']
 M2Weeks=Kaldfjordencleandata['M2_Weeks']
 
-np.savetxt('KM1Dominantcyclesbs.txt', M1Dominantcycles)
-np.savetxt('KM2Dominantcyclesbs.txt', M2Dominantcycles)
-np.savetxt('all 10 dominant cycles KM1',np.unique(M1Dominantcycles))
-np.savetxt('all 10 dominant cycles KM2',np.unique(M2Dominantcycles))
+##Import normalized backscatter
+a=Kaldfjordencleandata['ADCP_M2backscatfilt_10p']
+a[:,:20]=np.nan
+M2Backscatffilt=((a-np.nanmin(np.nanmin(a)))/(np.nanmax(np.nanmax(a))-np.nanmin(np.nanmin(a))))
+
+a=Kaldfjordencleandata['ADCP_M2backscatallint']
+a[a>120]=np.nan
+a.iloc[:,:20]=np.nan
+M2backscatallint=((a-np.min(np.min(a)))/(np.max(np.max(a))-np.min(np.min(a))))
 
 #Import weather data
 Kaldfjordenweather=pickle.load(open("Kaldfjorden Weather", "rb"))
@@ -261,6 +258,7 @@ SSChlafluxplot={'20m':[1.21,0.53,0.09,0.07,0.11,0.04,5.34,0.89],
                '50m':[1.14,0.58,0.1,0.07,0.1,0.04,3.42,0.3],
                '90m':[1.1,0.66,0.1,0.1,0.08,0.05,3.15,0.22]}
 
+#Import aquaculture data
 Aquaculture=pd.read_csv('Kaldfjorden_aquaculture_import.csv',sep=';')
 AC_Time=pd.to_datetime(np.unique(Aquaculture.iloc[:,0]),format='%d/%m/%Y')
 AC_Time=np.sort(AC_Time)
@@ -343,7 +341,7 @@ for j in range(len(Rad_time)):
 #cmap=matplotlib.colors.LinearSegmentedColormap.from_list('ReYeGn',['purple','brown','g','y','r'],N=256)
 #cmap=plt.cm.get_cmap('RdYlBu_r',256)
 
-#1 - Meteorology & Hydrography - KM1 & KM2
+#1 - Meteorology & Hydrography
 # =============================================================================
 # a, [plot1, plot2, plot3, plot4, plot5, plot6]= plt.subplots(6,1, sharex=True,sharey=False, figsize=(60,80),constrained_layout=True)
 # 
@@ -410,7 +408,6 @@ for j in range(len(Rad_time)):
 # a.show()
 # =============================================================================
 
-
 #2 long term sediment trap & adcp backscatter
 # =============================================================================
 # a, [plot1, plot2, plot3, plot4,plot5,plot6]= plt.subplots(6,1, sharex=True,sharey=False, figsize=(60,85),constrained_layout=True)
@@ -468,9 +465,7 @@ for j in range(len(Rad_time)):
 # 
 # =============================================================================
 
-
 #3. Seasonal overview Kaldfjorden==============================================
-
 # =============================================================================
 # a, [plot1, plot2, plot3, plot4, plot5, plot6, plot7, plot8, plot9,plot10]= plt.subplots(10,1, sharex=True,sharey=False, figsize=(55,75),constrained_layout=True)
 # 
@@ -557,13 +552,7 @@ for j in range(len(Rad_time)):
 # #plt.close(a)
 # =============================================================================
 
-
-
-
-
-
 #4 Daily patterns Kaldfjorden
-
 # =============================================================================
 # #Make 3 day times
 # M1threedays=np.zeros((int(len(M1backscatallint.iloc[:,1])/(24*3)+1),2),dtype='datetime64[s]')
@@ -683,7 +672,6 @@ for j in range(len(Rad_time)):
 # =============================================================================
     
 #5 averaged model days
-
 # =============================================================================
 # M1hours=Kaldfjordencleandata['ADCP_M1timeofmeasurement'][1:25]
 # M2hours=Kaldfjordencleandata['ADCP_M2timeofmeasurement'][20:44]
