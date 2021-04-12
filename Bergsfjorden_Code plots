@@ -1,13 +1,18 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Thu Oct 29 13:27:47 2020
+#PLOTTING BERGSFJORDEN_________________________________________________________
+Import aquaculture data
+Import sediment trap data
+Import clean ADCP data
+Import weather data
 
-@author: Menno
-"""
+#1 Meteorology & Hydrography
+#2 Long term sediment trap & ADCP backscatter
+#3 Daily patterns Kaldfjorden
+#4 Blown up plot
+#5 Daily patterns Kaldfjorden aquaculture
+#6 Long term comparison aquaculture & adcp backscatter
+#7 Sediment trap away from aquaculture farm
 
-#TO DO:
-# - Import data and plot
-
+#Import packages
 import scipy.io
 import scipy.interpolate
 import numpy as np
@@ -26,11 +31,7 @@ import matplotlib.pyplot as plt
 import seaborn
 import cmocean
 
-#Import clean ADCP data
-#Bergsfjordencleandata=pickle.load(open("Bergsfjorden clean ADCP data", "rb"))
-
-#Backscat=Bergsfjordencleandata['ADCP_M1_backscat_6dav']
-
+#Import aquaculture data
 Aquaculture=pd.read_csv('Bergsfjorden_aquaculture.csv',sep=',')
 AC_Tim=pd.to_datetime(np.unique(Aquaculture.iloc[1:,5]), format='%d.%m.%Y')
 AC_Time=np.zeros((1,len(AC_Tim)),dtype='datetime64[h]')
@@ -131,10 +132,6 @@ Distancefromfarm=[-10,10,100,200,400,700,1500]
 
 #Import clean ADCP data
 bergsfjordencleandata=pickle.load(open("Bergsfjorden clean ADCP data", "rb"))
-a=bergsfjordencleandata['Backscatcol1']
-a.iloc[:,:40]=np.nan
-Backscatcol1=((a-np.min(np.min(a)))/(np.max(np.max(a))-np.min(np.min(a))))
-
 Backscatcol1_6dav=bergsfjordencleandata['Backscatcol1_6dav']
 Backscatcol1_lp12h=bergsfjordencleandata['Backscatcol1_lp12h']
 Backscatcol1filt=bergsfjordencleandata['Backscatfilt>10p']
@@ -148,14 +145,12 @@ Backscatcol1filt3080d=bergsfjordencleandata['Backscatfilt30-80dd']
 Backscatcol1filt8096d=bergsfjordencleandata['Backscatfilt80-96d']
 Backscatcol1filt164d=bergsfjordencleandata['Backscatfilt164d']
 ADCPSal=bergsfjordencleandata['ADCPsal']
-
 Dominantcyclesbs=bergsfjordencleandata['Dominantcyclesbs']
 VertvelABcol1=bergsfjordencleandata['VertvelABcol1']
 VertvelABcol1_6dav=bergsfjordencleandata['VertvelABcol1_6dav']
 Vertvelcol1filt=bergsfjordencleandata['Vertvelfilt>10p']
 VertvelABcol1_lp12h=bergsfjordencleandata['VertvelABcol1_lp12h']
 Dominantcyclesvv=bergsfjordencleandata['Dominantcyclesvv']
-
 Speednorth=bergsfjordencleandata['Speedeast']
 Speedeast=bergsfjordencleandata['Speednorth']
 Chla=bergsfjordencleandata['Chl a']
@@ -168,11 +163,14 @@ Dens=bergsfjordencleandata['Density']
 Depth=bergsfjordencleandata['Depth']
 Weeks=bergsfjordencleandata['Weeks']
 Time=pd.to_datetime(bergsfjordencleandata['Time'])
-plt.plot(Time[4000:], ADCPSal[4000:])
+
+#Normalized backscatter
+a=bergsfjordencleandata['Backscatcol1']
+a.iloc[:,:40]=np.nan
+Backscatcol1=((a-np.min(np.min(a)))/(np.max(np.max(a))-np.min(np.min(a))))
 
 #Import weather data
 Bergsfjordenweather=pickle.load(open("Bergsfjorden Weather", "rb"))
-
 Wind_Hasvik=Bergsfjordenweather['Wind_Hasvik']
 Winddirection_Hasvik=Bergsfjordenweather['Winddirection_Hasvik']
 Wind_Hasvik_time=Bergsfjordenweather['Wind_Hasvik_time']
@@ -183,20 +181,18 @@ Solarrad=Bergsfjordenweather['Solarrad']
 Solartime=Bergsfjordenweather['Solartime']
 
 Moonphases=pd.read_csv('Bergsfjorden_Moon phases.csv',sep=';')
-
 Moonphases['New Moon']=pd.to_datetime(Moonphases['New Moon'], format='%d/%m/%Y %H:%M')
 Moonphases['First quarter']=pd.to_datetime(Moonphases['First quarter'], format='%d/%m/%Y %H:%M')
 Moonphases['Full Moon']=pd.to_datetime(Moonphases['Full Moon'], format='%d/%m/%Y %H:%M')
 Moonphases['Third quarter']=pd.to_datetime(Moonphases['Third quarter'], format='%d/%m/%Y %H:%M')
 Moonphases['Next full moon']=pd.to_datetime(Moonphases['Next full moon'], format='%d/%m/%Y %H:%M')
-
 Moonphases=Moonphases.to_numpy(dtype='datetime64[ns]')
 
 #PLOTTING
 #1 Meteorology & Hydrography 
 #2 long term sediment trap & adcp backscatter
 #3 Daily patterns Kaldfjorden
-#4 BLOWN UP PLOT
+#4 Blown up plot
 #5 Daily patterns Kaldfjorden aquaculture
 #6 Long term comparison aquaculture & adcp backscatter
 #7 Sediment trap away from aquaculture farm
@@ -204,7 +200,6 @@ Moonphases=Moonphases.to_numpy(dtype='datetime64[ns]')
 #Make data ready for plot
 Time=pd.to_datetime(bergsfjordencleandata['Time'])
 Depth=bergsfjordencleandata['Depth']
-
 Depth,Time=np.meshgrid(Depth, Time)
 
 #1 Meteorology & Hydrography 
@@ -267,8 +262,6 @@ Depth,Time=np.meshgrid(Depth, Time)
 # 
 # =============================================================================
 
-#start 2020-01-26T21:00:00.000000000 end 2020-07-10T15:00:00.00000000
-
 #2 long term sediment trap & adcp backscatter
 # =============================================================================
 # a, [plot1, plot2, plot3]= plt.subplots(3,1, sharex=True,sharey=False, figsize=(80,70),constrained_layout=True)
@@ -305,7 +298,6 @@ Depth,Time=np.meshgrid(Depth, Time)
 # # =============================================================================
 
 #3 Daily patterns Kaldfjorden
-
 # =============================================================================
 # #Make 3 day times
 # Threedays=np.zeros((int(len(Backscatcol1.iloc[:,1])/(48*3)+1),2),dtype='datetime64[s]')
@@ -369,7 +361,7 @@ Depth,Time=np.meshgrid(Depth, Time)
 #     
 # =============================================================================
     
-#4 BLOWN UP PLOT
+#4 Blown up plot
 # =============================================================================
 # a, [plot1, plot2, plot3, plot4, plot5, plot6, plot7, plot8]= plt.subplots(8,1, sharex=False,sharey=True, figsize=(60,80),constrained_layout=True)
 # 
@@ -429,9 +421,7 @@ Depth,Time=np.meshgrid(Depth, Time)
 # 
 # =============================================================================
 
-
 #5 Daily patterns Kaldfjorden aquaculture
-
 # =============================================================================
 # #Make 3 day times
 # Threedays=np.zeros((int(len(Backscatcol1.iloc[:,1])/(48*3)+1),2),dtype='datetime64[s]')
