@@ -44,8 +44,6 @@ import mat73
 mat= scipy.io.loadmat('Bergsfjorden_data_from Excel.mat', squeeze_me=True,struct_as_record=False)
 matCTD= mat73.loadmat('Bergsfjorden_CTD_NORFJORD.mat')
 
-ColumnTxt=mat['ColumnTxt']
-
 #General
 Depth=mat['data'].Depth[3:7960]                 #m
 Pressure=mat['data'].Pressure[3:7960]
@@ -197,7 +195,6 @@ for i in range(len(Watercolumn)):
     MDens_2[i,:]=c.interpolate(method='time')
 
     i=i+1 
-       
 
 #2.3 Correlation
 ##Col1
@@ -276,7 +273,6 @@ for i in range(len(Time)):  #for each measurement
 pH= 7   #Acidity unit: scale 1(acid) - 14(base) 
 f=600 #Frequency sound signal ADCP, unit: kHz
 
-
 CTD_Sal=np.meshgrid(Sal,Watercolumn ) #CTD_SAL 0 are all the salinity values
 CTD_Temp=np.meshgrid(Temp,Watercolumn) #CTD_TEMP 0 are all the temperature values
 a=np.min(Time)         #First measurement of ADCP 
@@ -293,7 +289,6 @@ d=np.where(Mtime_2==b)       #Row of CTD measurement where ADCP made its LAST me
 MSal_rn=MSal_2[:,int(c[0]-1):int(d[0]+1)]    #Make new file where Salinity and temperature are extracted based on ADCP measurments -> result = sal+temp for each ADCP measurement of the ADCP
 MTemp_rn=MTemp_2[:,int(c[0]-1):int(d[0]+1)]
 MDens_rn=MDens_2[:,int(c[0]-1):int(d[0]+1)]
-
 
 ##Make data file & run loop
 Sound_abs=np.zeros((len(Time),len(Watercolumn)),dtype='float')           
@@ -494,7 +489,6 @@ for i in range(len(Backscatcol1_3.iloc[1,:])):
 
     i=i+1
 
-
 #1 day
 Backscatffilt1d=np.zeros((len(Backscatcol1_3.iloc[:,1]),len(Backscatcol1_3.iloc[1,:])),dtype='float')
 
@@ -592,7 +586,6 @@ for i in range(len(Backscatcol1_3.iloc[1,:])):
     Backscatffilt164d[:,i]=sig.lfilter(b,a,Backscatcol1_3.iloc[:,i])
 
     i=i+1
-
 
 #3.2 Vertical velocity anomaly    
 # =============================================================================
