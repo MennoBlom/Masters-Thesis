@@ -336,7 +336,6 @@ for j in range(len(Rad_time)):
       
     j=j+1
 
-
 #Colormap
 #cmap=matplotlib.colors.LinearSegmentedColormap.from_list('ReYeGn',['purple','brown','g','y','r'],N=256)
 #cmap=plt.cm.get_cmap('RdYlBu_r',256)
