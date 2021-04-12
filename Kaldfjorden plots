@@ -1,0 +1,968 @@
+
+import scipy.io
+import scipy.interpolate
+import scipy.stats
+import numpy as np
+import pandas as pd
+import matplotlib
+import matplotlib.pyplot as plt
+from matplotlib.collections import LineCollection
+from matplotlib.colors import ListedColormap, BoundaryNorm
+from matplotlib import cm
+import datetime
+import gsw
+import pickle
+from mpl_toolkits.axes_grid1 import host_subplot
+import mpl_toolkits.axisartist as AA
+import matplotlib.pyplot as plt
+import cmocean
+import decimal
+from sklearn.linear_model import LinearRegression
+
+#Import clean ADCP data
+Kaldfjordencleandata=pickle.load(open("Kaldfjorden clean ADCP data", "rb"))
+
+M1backscat_6dav=Kaldfjordencleandata['ADCP_M1_backscat_6dav']
+M1backscat_lp6h=Kaldfjordencleandata['ADCP_M1_backscat_lp6h']
+M1backscat_lp12h=Kaldfjordencleandata['ADCP_M1_backscat_lp12h']
+M1backscat_lp24h=Kaldfjordencleandata['ADCP_M1_backscat_lp24h']
+M1backscat_lp90d=Kaldfjordencleandata['ADCP_M1_backscat_lp90d']
+a=Kaldfjordencleandata['ADCP_M1backscatfilt_10p']
+a[:,:20]=np.nan
+M1Backscatffilt=((a-np.nanmin(np.nanmin(a)))/(np.nanmax(np.nanmax(a))-np.nanmin(np.nanmin(a))))
+
+a=Kaldfjordencleandata['ADCP_M1backscatallint']
+a.iloc[:,:20]=np.nan
+M1backscatallint=((a-np.min(np.min(a)))/(np.max(np.max(a))-np.min(np.min(a))))
+
+M1Dominantcycles=Kaldfjordencleandata['ADCP_M1dominantcycles']
+#M1backscatbeam1=Kaldfjordencleandata['ADCP_M1backscatbeam1']
+#M1backscatbeam2=Kaldfjordencleandata['ADCP_M1backscatbeam2']
+#M1backscatbeam3=Kaldfjordencleandata['ADCP_M1backscatbeam3']
+#M1backscatbeam4=Kaldfjordencleandata['ADCP_M1backscatbeam4']
+M1Backscatcol1filt05d=Kaldfjordencleandata['ADCP_M1Backscatfilt05d']
+M1Backscatcol1filt1d=Kaldfjordencleandata['ADCP_M1Backscatfilt1d']
+M1Backscatcol1filt110d=Kaldfjordencleandata['ADCP_M1Backscatfilt1-10d']
+M1Backscatcol1filt1020d=Kaldfjordencleandata['ADCP_M1Backscatfilt10-20d']
+M1Backscatcol1filt2830d=Kaldfjordencleandata['ADCP_M1Backscatfilt28-30d']
+M1Backscatcol1filt3080d=Kaldfjordencleandata['ADCP_M1Backscatfilt30-80dd']
+M1Backscatcol1filt8096d=Kaldfjordencleandata['ADCP_M1Backscatfilt80-96d']
+M1Backscatcol1filt164d=Kaldfjordencleandata['ADCP_M1Backscatfilt164d']
+M1Backscatcol1filt320d=Kaldfjordencleandata['ADCP_M1Backscatfilt320d']
+M1vup1_lp6h=Kaldfjordencleandata['ADCP_M1vup1_lp6h']
+M1vup2_lp6h=Kaldfjordencleandata['ADCP_M1vup2_lp6h']
+M1vup1_lp12h=Kaldfjordencleandata['ADCP_M1vup1_lp12h']
+M1vup2_lp12h=Kaldfjordencleandata['ADCP_M1vup2_lp12h']
+M1vup1_lp24h=Kaldfjordencleandata['ADCP_M1vup1_lp24h']
+M1vup2_lp24h=Kaldfjordencleandata['ADCP_M1vup2_lp24h']
+M1vup1_lp90d=Kaldfjordencleandata['ADCP_M1vup1_lp90d']
+M1vup2_lp90d=Kaldfjordencleandata['ADCP_M1vup2_lp90d']
+M1vup1_ano_6dav=Kaldfjordencleandata['ADCP_M1vup1_ano_6dav']
+M1vup2_ano_6dav=Kaldfjordencleandata['ADCP_M1vup2_ano_6dav']
+M1depth=Kaldfjordencleandata['ADCP_M1depth']
+M1depthADCP=Kaldfjordencleandata['ADCP_M1depthADCP']
+M1timeofmeasurement=pd.to_datetime(Kaldfjordencleandata['ADCP_M1timeofmeasurement'])
+M1Weeks=Kaldfjordencleandata['M1_Weeks']
+M1sal=np.transpose(Kaldfjordencleandata['CTD_M1_Sal'])
+M1temp=np.transpose(Kaldfjordencleandata['CTD_M1_Temp'])
+M1dens=np.transpose(Kaldfjordencleandata['M1_Density'])
+M1tpm=Kaldfjordencleandata['ST_M1_TPM']
+M1poc=Kaldfjordencleandata['ST_M1_POC']
+M1chl=Kaldfjordencleandata['ST_M1_Chlorofylla']
+M1phy=Kaldfjordencleandata['ST_M1_phyplankton']
+M1zoo=Kaldfjordencleandata['ST_M1_zooplankton']
+M1tempADCP=Kaldfjordencleandata['M1_Temperature']
+M1Weeks=Kaldfjordencleandata['M1_Weeks']
+
+M2backscat_6dav=Kaldfjordencleandata['ADCP_M2_backscat_6dav']
+M2backscat_lp6h=Kaldfjordencleandata['ADCP_M2_backscat_lp6h']
+M2backscat_lp12h=Kaldfjordencleandata['ADCP_M2_backscat_lp12h']
+M2backscat_lp24h=Kaldfjordencleandata['ADCP_M2_backscat_lp24h']
+M2backscat_lp90d=Kaldfjordencleandata['ADCP_M2_backscat_lp90d']
+a=Kaldfjordencleandata['ADCP_M2backscatfilt_10p']
+a[:,:20]=np.nan
+M2Backscatffilt=((a-np.nanmin(np.nanmin(a)))/(np.nanmax(np.nanmax(a))-np.nanmin(np.nanmin(a))))
+
+
+a=Kaldfjordencleandata['ADCP_M2backscatallint']
+a[a>120]=np.nan
+a.iloc[:,:20]=np.nan
+M2backscatallint=((a-np.min(np.min(a)))/(np.max(np.max(a))-np.min(np.min(a))))
+
+M2Dominantcycles=Kaldfjordencleandata['ADCP_M2dominantcycles']
+#M2backscatbeam1=Kaldfjordencleandata['ADCP_M2backscatbeam1']
+#M2backscatbeam2=Kaldfjordencleandata['ADCP_M2backscatbeam2']
+#M2backscatbeam3=Kaldfjordencleandata['ADCP_M2backscatbeam3']
+#M2backscatbeam4=Kaldfjordencleandata['ADCP_M2backscatbeam4']
+M2Backscatcol1filt05d=Kaldfjordencleandata['ADCP_M2Backscatfilt05d']
+M2Backscatcol1filt1d=Kaldfjordencleandata['ADCP_M2Backscatfilt1d']
+M2Backscatcol1filt110d=Kaldfjordencleandata['ADCP_M2Backscatfilt1-10d']
+M2Backscatcol1filt1020d=Kaldfjordencleandata['ADCP_M2Backscatfilt10-20d']
+M2Backscatcol1filt2830d=Kaldfjordencleandata['ADCP_M2Backscatfilt28-30d']
+M2Backscatcol1filt3080d=Kaldfjordencleandata['ADCP_M2Backscatfilt30-80dd']
+M2Backscatcol1filt8096d=Kaldfjordencleandata['ADCP_M2Backscatfilt80-96d']
+M2Backscatcol1filt164d=Kaldfjordencleandata['ADCP_M2Backscatfilt164d']
+M2Backscatcol1filt320d=Kaldfjordencleandata['ADCP_M2Backscatfilt320d']
+M2vup1_lp6h=Kaldfjordencleandata['ADCP_M2vup1_lp6h']
+M2vup2_lp6h=Kaldfjordencleandata['ADCP_M2vup2_lp6h']
+M2vup1_lp12h=Kaldfjordencleandata['ADCP_M2vup1_lp12h']
+M2vup2_lp12h=Kaldfjordencleandata['ADCP_M2vup2_lp12h']
+M2vup1_lp24h=Kaldfjordencleandata['ADCP_M2vup1_lp24h']
+M2vup2_lp24h=Kaldfjordencleandata['ADCP_M2vup2_lp24h']
+M2vup1_lp90d=Kaldfjordencleandata['ADCP_M2vup1_lp90d']
+M2vup2_lp90d=Kaldfjordencleandata['ADCP_M2vup2_lp90d']
+M2vup1_ano_6dav=Kaldfjordencleandata['ADCP_M2vup1_ano_6dav']
+M2vup2_ano_6dav=Kaldfjordencleandata['ADCP_M2vup2_ano_6dav']
+M2depth=Kaldfjordencleandata['ADCP_M2depth']
+M2depthADCP=Kaldfjordencleandata['ADCP_M2depthACP']
+M2timeofmeasurement=Kaldfjordencleandata['ADCP_M2timeofmeasurement']
+M2Weeks=Kaldfjordencleandata['M2_Weeks']
+M2sal=np.transpose(Kaldfjordencleandata['CTD_M2_Sal'])
+M2temp=np.transpose(Kaldfjordencleandata['CTD_M2_Temp'])
+M2dens=np.transpose(Kaldfjordencleandata['M2_Density'])
+M2tpm=Kaldfjordencleandata['ST_M2_TPM']
+M2poc=Kaldfjordencleandata['ST_M2_POC']
+M2chl=Kaldfjordencleandata['ST_M2_Chlorofylla']
+M2phy=Kaldfjordencleandata['ST_M2_phyplankton']
+M2zoo=Kaldfjordencleandata['ST_M2_zooplankton']
+M2tempADCP=Kaldfjordencleandata['M2_Temperature']
+M2Weeks=Kaldfjordencleandata['M2_Weeks']
+
+np.savetxt('KM1Dominantcyclesbs.txt', M1Dominantcycles)
+np.savetxt('KM2Dominantcyclesbs.txt', M2Dominantcycles)
+np.savetxt('all 10 dominant cycles KM1',np.unique(M1Dominantcycles))
+np.savetxt('all 10 dominant cycles KM2',np.unique(M2Dominantcycles))
+
+#Import weather data
+Kaldfjordenweather=pickle.load(open("Kaldfjorden Weather", "rb"))
+Precipitation=Kaldfjordenweather['Precipitation']
+Precipitation_time=Kaldfjordenweather['Precipitation_time']
+Rad=Kaldfjordenweather['Rad_M1']
+Rad_t=Kaldfjordenweather['Rad_time_M1']
+WindHekfyr=Kaldfjordenweather['Wind_Hekfyr']
+WinddirectionHekfyr=Kaldfjordenweather['Winddirection_Hekfyr']
+WindHekfyr_time=Kaldfjordenweather['Wind_Hekfyr_time']
+WindLangnes=Kaldfjordenweather['Winddirection_Langnes']
+WinddirectionLangnes=Kaldfjordenweather['Winddirection_Langnes']
+WindLangnes_time=Kaldfjordenweather['Wind_Langnes_time']
+TempHekfyr=Kaldfjordenweather['TempHekfyr']
+TempLangnes=Kaldfjordenweather['TempLangnes']
+TempMasvik=Kaldfjordenweather['TempMasvik']
+TempHekfyr_time=Kaldfjordenweather['TempHekfyr_time']
+TempMasvik_time=Kaldfjordenweather['TempMasvik_time']
+TempLangnes_time=Kaldfjordenweather['TempLangnes_time']
+
+#import moon phases
+Moonphases=pd.read_csv('Kaldfjorden_Moon phases.csv',sep=';')
+
+Moonphases['New Moon']=pd.to_datetime(Moonphases['New Moon'], format='%d/%m/%Y %H:%M')
+Moonphases['First quarter']=pd.to_datetime(Moonphases['First quarter'], format='%d/%m/%Y %H:%M')
+Moonphases['Full Moon']=pd.to_datetime(Moonphases['Full Moon'], format='%d/%m/%Y %H:%M')
+Moonphases['Third Quarter']=pd.to_datetime(Moonphases['Third Quarter'], format='%d/%m/%Y %H:%M')
+Moonphases['Next full moon']=pd.to_datetime(Moonphases['Next full moon'], format='%d/%m/%Y %H:%M')
+
+Moonphases=Moonphases.to_numpy(dtype='datetime64[ns]')
+
+#Import short term sediment trap data
+a=pd.read_csv('Kaldfjorden_short_exported biomass.csv',sep=',')
+SSexportbiomtot=a
+SSexportbiom={'2017-10-05 00:00:00':a.iloc[0:4,:],
+              '2017-11-06 00:00:00':a.iloc[4:8,:],
+              '2017-12-01 00:00:00':a.iloc[8:12,:],
+              '2018-01-25 00:00:00':a.iloc[12:16,:],
+              '2018-02-15 00:00:00':a.iloc[16:20,:],
+              '2018-03-14 00:00:00':a.iloc[20:24,:],
+              '2018-04-04 00:00:00':a.iloc[24:28,:],
+              '2018-05-22 00:00:00':a.iloc[28:32,:]}
+
+a=pd.read_csv('Kaldfjorden_short_suspended biomass.csv',sep=',')
+SSsuspbiomtot=a
+SSsuspbiom={'2017-10-05 00:00:00':a.iloc[0:4,:],
+              '2017-11-06 00:00:00':a.iloc[4:8,:],
+              '2017-12-01 00:00:00':a.iloc[8:12,:],
+              '2018-01-25 00:00:00':a.iloc[12:16,:],
+              '2018-02-15 00:00:00':a.iloc[16:20,:],
+              '2018-03-14 00:00:00':a.iloc[20:24,:],
+              '2018-04-04 00:00:00':a.iloc[24:28,:],
+              '2018-05-22 00:00:00':a.iloc[28:32,:]}
+
+a=pd.read_csv('Kaldfjorden_short_zooplankton_import.csv',sep=';')
+SSzooplanktontot=a
+SSzooplankton={'2017-10-05 00:00:00':a.iloc[:,2],
+              '2017-11-06 00:00:00':a.iloc[:,3],
+              '2017-12-01 00:00:00':a.iloc[:,4],
+              '2018-01-25 00:00:00':a.iloc[:,5],
+              '2018-02-15 00:00:00':a.iloc[:,6],
+              '2018-03-14 00:00:00':a.iloc[:,7],
+              '2018-04-04 00:00:00':a.iloc[:,8],
+              '2018-05-22 00:00:00':a.iloc[:,9]}
+
+SSdates=np.zeros((2,8),dtype='datetime64[m]')
+SSdates[0,0]=pd.to_datetime('2017/10/05 12:24',format='%Y/%m/%d %H:%M') ; SSdates[1,0]=pd.to_datetime('2017/10/06 12:35',format='%Y/%m/%d %H:%M')
+SSdates[0,1]=pd.to_datetime('2017/11/06 10:50',format='%Y/%m/%d %H:%M') ; SSdates[1,1]=pd.to_datetime('2017/11/07 11:40',format='%Y/%m/%d %H:%M')
+SSdates[0,2]=pd.to_datetime('2017/12/01 09:30',format='%Y/%m/%d %H:%M') ; SSdates[1,2]=pd.to_datetime('2017/12/02 09:50',format='%Y/%m/%d %H:%M')
+SSdates[0,3]=pd.to_datetime('2018/01/25 09:40',format='%Y/%m/%d %H:%M') ; SSdates[1,3]=pd.to_datetime('2018/01/26 10:40',format='%Y/%m/%d %H:%M')
+SSdates[0,4]=pd.to_datetime('2018/02/15 10:30',format='%Y/%m/%d %H:%M') ; SSdates[1,4]=pd.to_datetime('2018/02/16 12:30',format='%Y/%m/%d %H:%M')
+SSdates[0,5]=pd.to_datetime('2018/03/13 21:16',format='%Y/%m/%d %H:%M') ; SSdates[1,5]=pd.to_datetime('2018/03/14 21:00',format='%Y/%m/%d %H:%M')
+SSdates[0,6]=pd.to_datetime('2018/04/04 16:43',format='%Y/%m/%d %H:%M') ; SSdates[1,6]=pd.to_datetime('2018/04/05 18:00',format='%Y/%m/%d %H:%M')
+SSdates[0,7]=pd.to_datetime('2018/05/22 10:10',format='%Y/%m/%d %H:%M') ; SSdates[1,7]=pd.to_datetime('2018/05/23 10:50',format='%Y/%m/%d %H:%M')
+
+SSdates1=pd.Series(['2017-10-05 00:00:00',
+                   '2017-11-06 00:00:00',
+                   '2017-12-01 00:00:00',
+                   '2018-01-25 00:00:00',
+                   '2018-02-15 00:00:00',
+                   '2018-03-14 00:00:00',
+                   '2018-04-04 00:00:00',
+                   '2018-05-22 00:00:00'])
+
+M1timeofmeasurement=Kaldfjordencleandata['ADCP_M1timeofmeasurement']
+M2timeofmeasurement=Kaldfjordencleandata['ADCP_M2timeofmeasurement']
+
+SSBackscatM1=np.zeros((len(SSdates[1,:]),7),dtype='float')
+SSBackscatM2=np.zeros((len(SSdates[1,:]),7),dtype='float')
+
+i=4
+for i in range(len(SSdates[1,:])):
+    
+    #M1
+    begin=np.argmin(np.abs(SSdates[0,i] - M1timeofmeasurement[:]))
+    end=np.argmin(np.abs(SSdates[1,i] - M1timeofmeasurement[:]))
+
+    SSBackscatM1[i,0]=np.sum(M1backscatallint.iloc[int(begin):int(end),20])
+    SSBackscatM1[i,1]=np.sum(M1backscatallint.iloc[int(begin):int(end),30])
+    SSBackscatM1[i,2]=np.sum(M1backscatallint.iloc[int(begin):int(end),50])
+    SSBackscatM1[i,3]=np.sum(M1backscatallint.iloc[int(begin):int(end),90])
+    SSBackscatM1[i,4]=np.sum(np.sum(M1backscatallint.iloc[int(begin):int(end),20:50]))
+    SSBackscatM1[i,5]=np.sum(np.sum(M1backscatallint.iloc[int(begin):int(end),50:100]))
+    SSBackscatM1[i,6]=np.sum(np.sum(M1backscatallint.iloc[int(begin):int(end),20:100]))
+    
+    #M2
+    begin=np.argmin(np.abs(SSdates[0,i] - M2timeofmeasurement[:]))
+    end=np.argmin(np.abs(SSdates[1,i] - M2timeofmeasurement[:]))
+
+    SSBackscatM2[i,0]=np.sum(M2backscatallint.iloc[int(begin):int(end),20])
+    SSBackscatM2[i,1]=np.sum(M2backscatallint.iloc[int(begin):int(end),30])
+    SSBackscatM2[i,2]=np.sum(M2backscatallint.iloc[int(begin):int(end),50])
+    SSBackscatM2[i,3]=np.sum(M2backscatallint.iloc[int(begin):int(end),90])
+    SSBackscatM2[i,4]=np.sum(np.sum(M2backscatallint.iloc[int(begin):int(end),20:50]))
+    SSBackscatM2[i,5]=np.sum(np.sum(M2backscatallint.iloc[int(begin):int(end),50:100]))
+    SSBackscatM2[i,6]=np.sum(np.sum(M2backscatallint.iloc[int(begin):int(end),20:100]))
+
+    i=i+1
+
+SSPOCfluxplot={'20m':[184.56,198.23,43.35,121.57,114.71,46.78,130.03,229.4],
+               '30m':[131.78,146.18,54.3,102.99,128.79,48.13,96.13,244.53],
+               '50m':[168.75,145.8,62.98,115.65,134.21,53.63,112.65,214.51],
+               '90m':[126.08,180.36,96.48,115.9,150.38,66.4,259.25,314.67]}
+
+SSChlafluxplot={'20m':[1.21,0.53,0.09,0.07,0.11,0.04,5.34,0.89],
+               '30m':[1.37,0.58,0.11,0.1,0.08,0.04,3.87,0.4],
+               '50m':[1.14,0.58,0.1,0.07,0.1,0.04,3.42,0.3],
+               '90m':[1.1,0.66,0.1,0.1,0.08,0.05,3.15,0.22]}
+
+Aquaculture=pd.read_csv('Kaldfjorden_aquaculture_import.csv',sep=';')
+AC_Time=pd.to_datetime(np.unique(Aquaculture.iloc[:,0]),format='%d/%m/%Y')
+AC_Time=np.sort(AC_Time)
+
+a=np.where(Aquaculture.iloc[:,3]==1)
+Aquacultureunit1=Aquaculture.iloc[a]
+
+a=np.where(Aquaculture.iloc[:,3]==2)
+Aquacultureunit2=Aquaculture.iloc[a]
+
+a=np.where(Aquaculture.iloc[:,3]==3)
+Aquacultureunit3=Aquaculture.iloc[a]
+
+a=np.where(Aquaculture.iloc[:,3]==4)
+Aquacultureunit4=Aquaculture.iloc[a]
+
+a=np.where(Aquaculture.iloc[:,3]==5)
+Aquacultureunit5=Aquaculture.iloc[a]
+
+Feeding=np.zeros((1,len(AC_Time)),dtype='float')
+
+i=584
+for i in range(len(AC_Time)):
+    
+    a=AC_Time[i]
+    a1=np.where(np.abs(AC_Time[i] == pd.to_datetime(Aquacultureunit1.iloc[:,0],format='%d/%m/%Y')))
+    a2=np.where(np.abs(AC_Time[i] == pd.to_datetime(Aquacultureunit2.iloc[:,0],format='%d/%m/%Y')))
+    a3=np.where(np.abs(AC_Time[i] == pd.to_datetime(Aquacultureunit3.iloc[:,0],format='%d/%m/%Y')))
+    a4=np.where(np.abs(AC_Time[i] == pd.to_datetime(Aquacultureunit4.iloc[:,0],format='%d/%m/%Y')))
+    a5=np.where(np.abs(AC_Time[i] == pd.to_datetime(Aquacultureunit5.iloc[:,0],format='%d/%m/%Y')))
+
+    if not all(a1) is True : b1=0
+    else: b1=float(Aquacultureunit1.iloc[int(a1[0]),15])
+
+    if not all(a2) is True : b2=0
+    else: b2=float(Aquacultureunit2.iloc[int(a2[0]),15])
+
+    if not all(a3) is True : b3=0
+    else: b3=float(Aquacultureunit3.iloc[int(a3[0]),15])
+
+    if not all(a4) is True : b4=0
+    else: b4=float(Aquacultureunit4.iloc[int(a4[0]),15])
+
+    if not all(a5) is True : b5=0
+    else: b5=float(Aquacultureunit5.iloc[int(a5[0]),15])
+
+    Feeding[0,i]=b1+b2+b3+b4+b5
+
+    i=i+1
+   
+#PLOTTING KALDFJORDEN_________________________________________________________
+#1 Meteorology & Hydrography
+#2 Long term sediment trap & adcp backscatter
+#3 Seasonal overview Kaldfjorden
+#4 Daily patterns Kaldfjorden
+#5 Averaged model days
+#6 Blown up plot
+#7 Short term sediment trap zooplankton
+#8 Short term sediment trap correlation
+
+#X and Y AXIS
+M1timeofmeasurement=Kaldfjordencleandata['ADCP_M1timeofmeasurement']
+M2timeofmeasurement=Kaldfjordencleandata['ADCP_M2timeofmeasurement']
+M1depth=Kaldfjordencleandata['ADCP_M1depth']
+M2depth=Kaldfjordencleandata['ADCP_M2depth']
+
+M1depth,M1timeofmeasurement=np.meshgrid(M1depth,M1timeofmeasurement)
+M2depth,M2timeofmeasurement=np.meshgrid(M2depth,M2timeofmeasurement)
+
+Rad_time=np.zeros((len(Rad_t),1),dtype='datetime64[s]')
+
+for j in range(len(Rad_time)):
+    
+    Rad_time[j]=datetime.datetime.strptime(str(Rad_t[j]),'%Y-%m-%dT%H:%M:%S')
+      
+    j=j+1
+
+
+#Colormap
+#cmap=matplotlib.colors.LinearSegmentedColormap.from_list('ReYeGn',['purple','brown','g','y','r'],N=256)
+#cmap=plt.cm.get_cmap('RdYlBu_r',256)
+
+#1 - Meteorology & Hydrography - KM1 & KM2
+# =============================================================================
+# a, [plot1, plot2, plot3, plot4, plot5, plot6]= plt.subplots(6,1, sharex=True,sharey=False, figsize=(60,80),constrained_layout=True)
+# 
+# #Solar
+# plot1.plot(Rad_time[:],Rad)
+# plot1.set_title('Solar radiation', fontsize=60, fontweight='bold')
+# plot1.set_ylabel('$W/m^2$',fontsize=60)
+# plot1.set_ylim(0,1300)
+# plot1.grid()
+# 
+# #Atmospheric Temp
+# plot2.set_title('Atmospheric temperature', fontsize=60, fontweight='bold')
+# plot2.plot(TempHekfyr_time,TempHekfyr, color='b', label='Hekkingen Fyr')
+# plot2.plot(TempLangnes_time,TempLangnes, color='r', label='Langnes')
+# plot2.plot(TempMasvik_time,TempMasvik, color='g', label=' Masvik')
+# plot2.set_ylabel('$C^\circ$',fontsize=60)
+# plot2.legend(fontsize=60)
+# plot2.grid()
+# 
+# #Windspeed
+# plot3.set_title('Windspeed', fontsize=60, fontweight='bold')
+# plot3.plot(WindHekfyr_time,WindHekfyr)
+# plot3.set_ylabel('m/s',fontsize=60)
+# #plt.yticks(np.arange(np.min(Wind), np.max(Wind))
+# plot3.grid()
+# 
+# #Winddirection
+# plot4.set_title('Wind direction', fontsize=60, fontweight='bold')
+# plot4.plot(WindHekfyr_time,WinddirectionHekfyr)
+# plot4.set_ylabel('Degrees ($^\circ$)',fontsize=60)
+# plot4.grid()
+# 
+# cmap=cmocean.cm.dense
+# plot5.set_title('Potential density KM1', fontsize=60, fontweight='bold')
+# plot5.contourf(M1timeofmeasurement[:,:], M1depth[:,:],M1dens[:,:],[1024,1024.5,1025,1025.5,1026,1026.5,1027,1027.5,1028],cmap=cmap)
+# plot5.set_ylabel('Depth (m)',fontsize=60)
+# plot5.invert_yaxis()
+# plot5.grid()
+# cbar=plt.cm.ScalarMappable(cmap=cmap)
+# cbar.set_array(M1dens[:,:])
+# cbar.set_clim(np.min(M1dens[:,:]),np.max(M1dens[:,:]))
+# b=plt.colorbar(cbar,boundaries=(1024,1024.5,1025,1025.5,1026,1026.5,1027,1027.5,1028),ax=[plot5], location='bottom', shrink=0.75)
+# b.set_label(label='$kg/m^3$', fontsize=60)
+# 
+# cmap=cmocean.cm.dense
+# plot6.set_title('Potential density KM2', fontsize=60, fontweight='bold')
+# plot6.contourf(M2timeofmeasurement[:,:], M2depth[:,:],M2dens[:,:],[1024,1024.5,1025,1025.5,1026,1026.5,1027,1027.5,1028],cmap=cmap)
+# plot6.set_ylabel('Depth (m)',fontsize=60)
+# plot6.invert_yaxis()
+# plot6.set_xlabel('Time (month year)', fontsize=60)
+# plot6.xaxis.set_major_formatter(matplotlib.dates.DateFormatter("%b %Y"))
+# plot6.grid()
+# cbar=plt.cm.ScalarMappable(cmap=cmap)
+# cbar.set_array(M2dens[:,:])
+# cbar.set_clim(np.min(M2dens[:,:]),np.max(M2dens[:,:]))
+# b=plt.colorbar(cbar,boundaries=(1024,1024.5,1025,1025.5,1026,1026.5,1027,1027.5,1028),ax=[plot6], location='bottom', shrink=0.75)
+# b.set_label(label='$kg/m^3$', fontsize=60)
+# 
+# plt.rc('xtick',labelsize=60)
+# plt.rc('ytick',labelsize=60)
+# 
+# plt.savefig('01_Plots/10_Final/Kaldfjordenhydrographyall.png',bbox_inches='tight')
+# 
+# a.show()
+# =============================================================================
+
+
+#2 long term sediment trap & adcp backscatter
+# =============================================================================
+# a, [plot1, plot2, plot3, plot4,plot5,plot6]= plt.subplots(6,1, sharex=True,sharey=False, figsize=(60,85),constrained_layout=True)
+# 
+# plot1.plot(M1timeofmeasurement[:,0], M1tpm[:,0], color='b', label='KM1',linewidth=5)
+# plot1.plot(M2timeofmeasurement[:,0], M2tpm[:,0], color='r', label='KM2',linewidth=5)
+# plot1.set_ylabel('$g/m^2/d$',fontsize=80)
+# plot1.set_title('TPM-flux',fontsize=80,fontweight='bold')
+# plot1.legend(fontsize=60)
+# plot1.grid()
+# 
+# plot2.plot(M1timeofmeasurement[:,0], M1poc[:,0], color='b', label='KM1',linewidth=5)
+# plot2.plot(M2timeofmeasurement[:,0], M2poc[:,0], color='r', label='KM2',linewidth=5)
+# plot2.set_ylabel('$mg/m^2/d$',fontsize=80)
+# plot2.set_title('POC-flux',fontsize=80,fontweight='bold')
+# plot2.legend(fontsize=60)
+# plot2.grid()
+#  
+# plot3.plot(M1timeofmeasurement[:,0], M1chl[:,0], color='b', label='KM1',linewidth=5)
+# plot3.plot(M2timeofmeasurement[:,0], M2chl[:,0], color='r', label='KM2',linewidth=5)
+# plot3.set_ylabel('$\mu g/m^2/d$',fontsize=80)
+# plot3.set_title('Chlorophyll a-flux',fontsize=80,fontweight='bold')
+# plot3.legend(fontsize=60)
+# plot3.grid()
+# 
+# plot4.plot(M1timeofmeasurement[:,0], M1zoo[:,0], color='b', label='KM1',linewidth=5)
+# plot4.plot(M2timeofmeasurement[:,0], M2zoo[:,0], color='r', label='KM2',linewidth=5)
+# plot4.set_ylabel('$individuals/m^2/d$',fontsize=80,fontweight='bold')
+# plot4.set_title('Zooplankton-flux',fontsize=80,fontweight='bold')
+# plot4.legend(fontsize=60)
+# plot4.grid()
+# 
+# cmap=plt.cm.get_cmap('RdYlBu_r',10)
+# plot5.contourf(M1timeofmeasurement[:,20:165],M1depth[:,20:165],M1backscatallint.iloc[:,20:165],[0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0],cmap=cmap)
+# plot5.set_ylabel('Depth (m)',fontsize=80)
+# plot5.set_title('Normalized backscatter KM1',fontsize=80,fontweight='bold')
+# plot5.invert_yaxis()
+# 
+# plot6.contourf(M2timeofmeasurement[:,20:135],M2depth[:,20:135],M2backscatallint.iloc[:,20:135],[0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0],cmap=cmap)
+# plot6.set_ylabel('Depth (m)',fontsize=80)
+# plot6.set_title('Normalized backscatter KM2',fontsize=80,fontweight='bold')
+# plot6.set_xlabel('Time (month year)', fontsize=80)
+# plot6.xaxis.set_major_formatter(matplotlib.dates.DateFormatter("%b %Y"))
+# plot6.invert_yaxis()
+# cbar=plt.cm.ScalarMappable(cmap=cmap)
+# cbar.set_array(M1backscatallint.iloc[:,20:135])
+# cbar.set_clim(0.00,1.00)
+# b=plt.colorbar(cbar,boundaries=(0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0),ax=[plot6], location='bottom', shrink=0.75)
+# b.set_label(label='Normalized backscatter (0-1)', fontsize=80)
+# 
+# plt.rc('xtick',labelsize=50)
+# plt.rc('ytick',labelsize=50)
+# 
+# plt.savefig('01_Plots/10_FINAL/KalfdjordenLongterm.png')
+# 
+# =============================================================================
+
+
+#3. Seasonal overview Kaldfjorden==============================================
+
+# =============================================================================
+# a, [plot1, plot2, plot3, plot4, plot5, plot6, plot7, plot8, plot9,plot10]= plt.subplots(10,1, sharex=True,sharey=False, figsize=(55,75),constrained_layout=True)
+# 
+# plot1.plot(Rad_time[:],Rad)
+# plot1.set_ylabel('$W/m^2$',fontsize=60)
+# plot1.set_title('Solar irradiance',fontsize=60,fontweight='bold')
+# 
+# cmap=cmocean.cm.dense
+# plot2.contourf(M1timeofmeasurement[:,0:165], M1depth[:,0:165],M1dens[:,0:165],[1024,1024.5,1025,1025.5,1026,1026.5,1027,1027.5,1028],cmap=cmap)
+# plot2.set_ylabel('Depth (m)',fontsize=60)
+# plot2.set_title('Potential density KM1',fontsize=60,fontweight='bold')
+# plot2.invert_yaxis()
+# cmap=cmocean.cm.dense
+# 
+# cmap=cmocean.cm.dense
+# plot3.contourf(M2timeofmeasurement[:,0:135], M2depth[:,0:135],M2dens[:,0:135],[1024,1024.5,1025,1025.5,1026,1026.5,1027,1027.5,1028],cmap=cmap)
+# plot3.set_ylabel('Depth (m)',fontsize=60)
+# plot3.set_title('Potential density KM2',fontsize=60,fontweight='bold')
+# plot3.invert_yaxis()
+# 
+# cmap=cmocean.cm.dense
+# cbar=plt.cm.ScalarMappable(cmap=cmap)
+# cbar.set_array(M1dens[:,:])
+# cbar.set_clim(np.min(M1dens[:,:]),np.max(M1dens[:,:]))
+# b=plt.colorbar(cbar,boundaries=(1024,1024.5,1025,1025.5,1026,1026.5,1027,1027.5,1028),ax=[plot3], location='bottom', shrink=0.5)
+# b.set_label(label='$kg/m^3$', fontsize=60)
+# 
+# plot4.plot(M1timeofmeasurement[:,0], M1tpm[:,0], color='b', label='KM1',linewidth=5)
+# plot4.plot(M2timeofmeasurement[:,0], M2tpm[:,0], color='r', label='KM2',linewidth=5)
+# plot4.set_ylabel('$g/m^2/d$',fontsize=60)
+# plot4.set_title('TPM-flux',fontsize=60,fontweight='bold')
+# plot4.legend(fontsize=60)
+# plot4.grid()
+# 
+# plot5.plot(M1timeofmeasurement[:,0], M1poc[:,0], color='b', label='KM1',linewidth=5)
+# plot5.plot(M2timeofmeasurement[:,0], M2poc[:,0], color='r', label='KM2',linewidth=5)
+# plot5.set_ylabel('$mg/m2/d$',fontsize=60)
+# plot5.set_title('POC-flux',fontsize=60,fontweight='bold')
+# plot5.legend(fontsize=60)
+# plot5.grid()
+#  
+# plot6.plot(M1timeofmeasurement[:,0], M1chl[:,0], color='b', label='KM1',linewidth=5)
+# plot6.plot(M2timeofmeasurement[:,0], M2chl[:,0], color='r', label='KM2',linewidth=5)
+# plot6.set_ylabel('$\mu g/m^2/d$',fontsize=60)
+# plot6.set_title('Chlorophyll a-flux',fontsize=60,fontweight='bold')
+# plot6.legend(fontsize=60)
+# plot6.grid()
+# 
+# plot7.plot(M1timeofmeasurement[:,0], M1zoo[:,0], color='b', label='KM1',linewidth=5)
+# plot7.plot(M2timeofmeasurement[:,0], M2zoo[:,0], color='r', label='KM2',linewidth=5)
+# plot7.set_ylabel('$individuals/m^2/day$',fontsize=60)
+# plot7.set_title('Zooplankton flux',fontsize=60,fontweight='bold')
+# plot7.legend(fontsize=60)
+# plot7.grid()
+# 
+# plot8.plot(AC_Time[117:427],Feeding[0,117:427], color='b')
+# plot8.set_ylabel('Biomass (kg)',fontsize=60)
+# plot8.set_title('Aquaculture production',fontsize=60,fontweight='bold')
+# plot8.grid()
+# 
+# cmap=plt.cm.get_cmap('RdYlBu_r',10)
+# plot9.contourf(M1timeofmeasurement[:,20:165],M1depth[:,20:165],M1backscatallint.iloc[:,20:165],[0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0],cmap=cmap)
+# plot9.set_ylabel('Depth (m)',fontsize=60)
+# plot9.set_title('Normalized backscatter KM1',fontsize=60,fontweight='bold')
+# plot9.invert_yaxis()
+# 
+# plot10.contourf(M2timeofmeasurement[:,20:135],M2depth[:,20:135],M2backscatallint.iloc[:,20:135],[0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0],cmap=cmap)
+# plot10.set_ylabel('Depth (m)',fontsize=60)
+# plot10.set_title('Normalized backscatter KM2',fontsize=60,fontweight='bold')
+# plot10.set_xlabel('Time (month year)', fontsize=60)
+# plot10.xaxis.set_major_formatter(matplotlib.dates.DateFormatter("%b %Y"))
+# plot10.invert_yaxis()
+# cbar=plt.cm.ScalarMappable(cmap=cmap)
+# cbar.set_array(M1backscatallint.iloc[:,20:135])
+# cbar.set_clim(0.00,1.00)
+# b=plt.colorbar(cbar,boundaries=(0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0),ax=[plot10], location='bottom', shrink=0.5)
+# b.set_label(label='Normalized backscatter (0-1)', fontsize=60)
+# 
+# plt.rc('xtick',labelsize=60)
+# plt.rc('ytick',labelsize=60)
+# 
+# plt.savefig('01_Plots/10_Final/KaldfjordenLong term comparison.png')
+# 
+# #plt.close(a)
+# =============================================================================
+
+
+
+
+
+
+#4 Daily patterns Kaldfjorden
+
+# =============================================================================
+# #Make 3 day times
+# M1threedays=np.zeros((int(len(M1backscatallint.iloc[:,1])/(24*3)+1),2),dtype='datetime64[s]')
+# M1Starttime=Kaldfjordencleandata['ADCP_M1timeofmeasurement'][0]
+# 
+# for i in range(len(M1threedays)):                             #Mark beginning and end of each week.
+# 
+#     M1threedays[i,0]=np.datetime64(M1Starttime)+np.timedelta64(i,'3D')
+#     M1threedays[i,1]=np.datetime64(M1Starttime)+np.timedelta64(i+1,'3D')-np.timedelta64(1,'h')
+#  
+#     i=i+1
+# 
+# M2threedays=np.zeros((int(len(M2backscatallint.iloc[:,1])/(24*3)+1),2),dtype='datetime64[s]')
+# M2Starttime=Kaldfjordencleandata['ADCP_M2timeofmeasurement'][0]
+# 
+# for i in range(len(M2threedays)):                             #Mark beginning and end of each week.
+# 
+#     M2threedays[i,0]=np.datetime64(M2Starttime)+np.timedelta64(i,'3D')
+#     M2threedays[i,1]=np.datetime64(M2Starttime)+np.timedelta64(i+1,'3D')-np.timedelta64(1,'h')
+#  
+#     i=i+1
+# i=1
+# for i in range(len(M1threedays)):
+#     a, [plot1, plot2, plot3]= plt.subplots(3,1, sharex=True,sharey=False, figsize=(60,40), constrained_layout=True)
+#     
+#     begin=np.argmin(np.abs(Rad_time - M1threedays[i,0]))
+#     end=np.argmin(np.abs(Rad_time - M1threedays[i,1]))
+# 
+#     plot1.plot(Rad_time[begin:end],Rad[begin:end], 'g')
+#     plot1.set_ylabel('$W/m^2$',fontsize=60)
+#     plot1.set_title('Solar irradiance',fontsize=100,fontweight='bold')
+#     plot1.set_ylim(0,np.max(Rad))
+#     
+#     begin=np.where(M1threedays[i,0]==M1timeofmeasurement[:,1])
+#     end=np.where(M1threedays[i,1]==M1timeofmeasurement[:,1])
+#     
+#     #cmap=cmocean.cm.balance
+#     cmap=plt.cm.get_cmap('RdYlBu_r',10)
+#     plot2.contourf(M1timeofmeasurement[int(begin[0]):int(end[0]),20:160],M1depth[int(begin[0]):int(end[0]),20:160],M1backscatallint.iloc[int(begin[0]):int(end[0]),20:160],np.linspace(round(np.min(np.min(M1backscatallint.iloc[int(begin[0]):int(end[0]),20:165])),1),round(np.max(np.max(M1backscatallint.iloc[int(begin[0]):int(end[0]),20:165])),1),11),cmap=cmap)
+#     plot2.set_ylabel('Depth (m)',fontsize=60)
+#     plot2.set_title('Normalized backscatter',fontsize=100,fontweight='bold')
+#     plot2.invert_yaxis()
+#     cbar=plt.cm.ScalarMappable(cmap=cmap)
+#     cbar.set_array(M1backscatallint.iloc[int(begin[0]):int(end[0]),20:165])
+#     cbar.set_clim(np.min(np.min(M1backscatallint.iloc[int(begin[0]):int(end[0]),20:165])),np.max(np.max(M1backscatallint.iloc[int(begin[0]):int(end[0])])))
+#     b=plt.colorbar(cbar,boundaries=np.linspace(round(np.min(np.min(M1backscatallint.iloc[int(begin[0]):int(end[0]),20:165])),1),round(np.max(np.max(M1backscatallint.iloc[int(begin[0]):int(end[0]),20:165])),1),11),ax=[plot2], location='bottom', shrink=0.5)
+#     b.set_label(label='Normalized backscatter (0-1)', fontsize=80)
+# 
+#     cmap=plt.cm.get_cmap('RdYlBu_r',4)
+#     plot3.contourf(M1timeofmeasurement[int(begin[0]):int(end[0]),20:160],M1depth[int(begin[0]):int(end[0]),20:160],M1vup1_lp12h[int(begin[0]):int(end[0]),20:160],[-0.05,-0.01,0,0.01,0.05],cmap=cmap)
+#     plot3.set_xlabel('Time (Hour day month )', fontsize=60)
+#     plot3.xaxis.set_major_formatter(matplotlib.dates.DateFormatter("%Hh %d %b "))
+#     plot3.set_ylabel('Depth (m)',fontsize=60)
+#     plot3.set_title('12h low-passed vertical velocity',fontsize=100,fontweight='bold')
+#     plot3.invert_yaxis()
+#     cbar=plt.cm.ScalarMappable(cmap=cmap)
+#     cbar.set_array(M1vup1_lp24h[int(begin[0]):int(end[0]),20:160])
+#     cbar.set_clim(-0.05,0.05)
+#     b=plt.colorbar(cbar,boundaries=[-0.05,-0.01,0,0.01,0.05],ax=[plot3],location='bottom', shrink=0.5) 
+#     b.set_label(label='Vertical velocity (cm/s)', fontsize=80)        
+#     plt.rc('xtick',labelsize=70)
+#     plt.rc('ytick',labelsize=70)
+#     
+#     plt.savefig('01_Plots/10_FINAL/3d/KM1/3days #{}.png'.format(i+1))
+#     
+#     plt.close(a)
+# 
+#     i=i+1
+# i=5
+# for i in range(len(M2threedays)):
+#     a, [plot1, plot2, plot3]= plt.subplots(3,1, sharex=True,sharey=False, figsize=(50,40), constrained_layout=True)
+#     
+#     begin=np.argmin(np.abs(Rad_time - M2threedays[i,0]))
+#     end=np.argmin(np.abs(Rad_time - M2threedays[i,1]))
+# 
+#     plot1.plot(Rad_time[begin:end],Rad[begin:end], 'g')
+#     plot1.set_ylabel('$W/m^2$',fontsize=80)
+#     plot1.set_title('Solar irradiance',fontsize=100,fontweight='bold')
+#     plot1.set_ylim(0,np.max(Rad))
+#     
+#     begin=np.where(M2threedays[i,0]==M2timeofmeasurement[:,1])
+#     end=np.where(M2threedays[i,1]==M2timeofmeasurement[:,1])
+#     
+#     #cmap=cmocean.cm.balance
+#     cmap=plt.cm.get_cmap('RdYlBu_r',10)
+#     plot2.contourf(M2timeofmeasurement[int(begin[0]):int(end[0]),20:160],M2depth[int(begin[0]):int(end[0]),20:160],M2backscatallint.iloc[int(begin[0]):int(end[0]),20:160],np.linspace(round(np.min(np.min(M2backscatallint.iloc[int(begin[0]):int(end[0]),20:165])),1),round(np.max(np.max(M2backscatallint.iloc[int(begin[0]):int(end[0]),20:165])),1),11),cmap=cmap)
+#     plot2.set_ylabel('Depth (m)',fontsize=80)
+#     plot2.set_title('Normalized backscatter',fontsize=100,fontweight='bold')
+#     plot2.invert_yaxis()
+#     cbar=plt.cm.ScalarMappable(cmap=cmap)
+#     cbar.set_array(M1backscatallint.iloc[int(begin[0]):int(end[0]),20:165])
+#     cbar.set_clim(np.min(np.min(M2backscatallint.iloc[int(begin[0]):int(end[0]),20:165])),np.max(np.max(M2backscatallint.iloc[int(begin[0]):int(end[0])])))
+#     b=plt.colorbar(cbar,boundaries=np.linspace(round(np.min(np.min(M2backscatallint.iloc[int(begin[0]):int(end[0]),20:165])),1),round(np.max(np.max(M2backscatallint.iloc[int(begin[0]):int(end[0]),20:165])),1),11),ax=[plot2], location='bottom', shrink=0.5)
+#     b.set_label(label='Normalized backscatter (0-1)', fontsize=80)
+# 
+#     cmap=plt.cm.get_cmap('RdYlBu_r',4)
+#     plot3.contourf(M2timeofmeasurement[int(begin[0]):int(end[0]),20:160],M2depth[int(begin[0]):int(end[0]),20:160],M2vup1_lp12h[int(begin[0]):int(end[0]),20:160],[-0.05,-0.01,0,0.01,0.05],cmap=cmap)
+#     plot3.set_xlabel('Time (Hour day month )', fontsize=80)
+#     plot3.xaxis.set_major_formatter(matplotlib.dates.DateFormatter("%Hh %d %b "))
+#     plot3.set_ylabel('Depth (m)',fontsize=80)
+#     plot3.set_title('12h low-passed vertical velocity',fontsize=100,fontweight='bold')
+#     plot3.invert_yaxis()
+#     cbar=plt.cm.ScalarMappable(cmap=cmap)
+#     cbar.set_array(M2vup1_lp24h[int(begin[0]):int(end[0]),20:160])
+#     cbar.set_clim(-0.05,0.05)
+#     b=plt.colorbar(cbar,boundaries=[-0.05,-0.01,0,0.01,0.05],ax=[plot3],location='bottom', shrink=0.5) 
+#     b.set_label(label='Vertical velocity (cm/s)', fontsize=80)        
+#     plt.rc('xtick',labelsize=70)
+#     plt.rc('ytick',labelsize=70)
+#     
+#     plt.savefig('01_Plots/10_FINAL/3d/KM2/3days #{}.png'.format(i+1))
+#     
+#     plt.close(a)
+# 
+#     i=i+1
+#     
+# =============================================================================
+    
+#5 averaged model days
+
+# =============================================================================
+# M1hours=Kaldfjordencleandata['ADCP_M1timeofmeasurement'][1:25]
+# M2hours=Kaldfjordencleandata['ADCP_M2timeofmeasurement'][20:44]
+# M1depth=Kaldfjordencleandata['ADCP_M1depth']
+# M2depth=Kaldfjordencleandata['ADCP_M2depth']
+# 
+# M1hours,M1depth=np.meshgrid(M1hours,M1depth)
+# M2hours,M2depth=np.meshgrid(M2hours,M2depth)
+# i=5
+# 
+# for i in range (len(M1Weeks)-1):
+#     a, [plot1,plot2]=plt.subplots(2,1, sharex=True, sharey=True, figsize=(10,10))
+#     
+#     cmap=plt.cm.get_cmap('RdYlBu_r',4)
+#     plot1.contourf(M1hours[20:160,:],M1depth[20:160,:],M1vup1_ano_6dav[i][20:160,:],[-0.05,-0.01,0,0.01,0.05],cmap=cmap)
+#     plot1.set_xlabel('Date (Hour:Min)', fontsize=15)
+#     plot1.set_ylabel('Depth (m)',fontsize=15)
+#     plot1.set_title('Vertical veocity',fontsize=15,fontweight='bold')
+#     plot1.grid()
+#     
+#     cmap=plt.cm.get_cmap('RdYlBu_r',20)
+#     plot2.contourf(M1hours[20:160,:],M1depth[20:160,:],M1backscat_6dav[i][20:160,:],50,cmap=cmap)
+#     plot2.set_title('MODEL DAY from {} to {}'.format(str(M1Weeks[i,0]),str(M1Weeks[i,1])),fontsize=15,fontweight='bold')
+#     plot2.set_xlabel('Date (Hour:Min)', fontsize=15)
+#     plot2.set_ylabel('Depth (m)',fontsize=15)
+#     plot2.xaxis.set_major_formatter(matplotlib.dates.DateFormatter("%H:%M"))
+#     plot2.invert_yaxis()
+#     plot2.grid()
+#     plot2.xaxis.set_major_formatter(matplotlib.dates.DateFormatter("%H:%M"))
+#     plot2.invert_xaxis()
+# 
+#     plt.rc('xtick',labelsize=15)
+#     plt.rc('ytick',labelsize=15)
+# 
+#     plt.savefig('01_Plots/10_FINAL/Model day/KM1/Model day_Week {}_ From  {} to {}.png'.format(i+1,str(M1Weeks[i,0]),str(M1Weeks[i,1])))
+#     
+#     plt.close(a)
+#     
+#     i=i+1
+# 
+# for i in range (len(M2Weeks)-1):
+#     a, [plot2, plot1]=plt.subplots(2,1, sharex=True, sharey=True, figsize=(10,10))
+# 
+#     plt.rc('xtick',labelsize=10)
+#     plt.rc('ytick',labelsize=10)
+#     
+#     cmap=plt.cm.get_cmap('RdYlBu_r',12)
+#     plot1.contourf(M2hours[20:130,:],M2depth[20:130,:],M2backscat_6dav[i][20:130,:],50,cmap=cmap)
+#     plot1.set_title('MODEL DAY M2 backsc from {} to {}'.format(str(M2Weeks[i,0]),str(M2Weeks[i,1])),fontsize=15,fontweight='bold')
+#     plot1.set_xlabel('Date (Hour:Min)', fontsize=15)
+#     plot1.set_ylabel('Depth (m)',fontsize=15)
+#     plot1.xaxis.set_major_formatter(matplotlib.dates.DateFormatter("%H:%M"))
+#     plot1.invert_yaxis()
+#     plot1.grid()
+# 
+#     cmap=plt.cm.get_cmap('RdYlBu_r',4)
+#     plot2.contourf(M2hours[20:130,:],M2depth[20:130,:],M2vup1_ano_6dav[i][20:130,:],[-0.05,-0.01,0,0.01,0.05],cmap=cmap)
+#     plot2.set_xlabel('Date (Hour:Min)', fontsize=15)
+#     plot2.set_ylabel('Depth (m)',fontsize=15)
+#     plot2.xaxis.set_major_formatter(matplotlib.dates.DateFormatter("%H:%M"))
+#     plot2.invert_xaxis()
+#     plot2.set_title('Vertical veocity',fontsize=15,fontweight='bold')
+#     plot2.grid()
+# 
+#     plt.savefig('01_Plots/10_FINAL/Model day/KM2/Model day_Week {}_ From  {} to {}.png'.format(i+1,str(M2Weeks[i,0]),str(M2Weeks[i,1])))
+#     
+#     plt.close(a)
+# 
+#     i=i+1
+# 
+# =============================================================================
+
+
+#6 BLOWN UP PLOT_________________________________________________________________
+##M1
+# =============================================================================
+# a, [plot1, plot2, plot3, plot4, plot5, plot6, plot7, plot8]= plt.subplots(8,1, sharex=False,sharey=True, figsize=(60,80),constrained_layout=True)
+# 
+# cmap=plt.cm.get_cmap('RdYlBu_r',8)
+# plot1.contourf(M1timeofmeasurement[0:936,20:160],M1depth[0:936,20:160],M1backscatallint.iloc[0:936,20:160],np.linspace(round(np.min(np.min(M1backscatallint.iloc[:,20:160])),1),round(np.max(np.max(M1backscatallint.iloc[:,20:160])),1),11),cmap=cmap)
+# plot1.xaxis.set_major_formatter(matplotlib.dates.DateFormatter("%d %b"))
+# plot1.set_ylabel('Depth (m)',fontsize=50)
+# 
+# cmap=plt.cm.get_cmap('RdYlBu_r',8)
+# plot2.contourf(M1timeofmeasurement[936:1872,20:160],M1depth[936:1872,20:160],M1backscatallint.iloc[936:1872,20:160],np.linspace(round(np.min(np.min(M1backscatallint.iloc[:,20:160])),1),round(np.max(np.max(M1backscatallint.iloc[:,20:160])),1),11),cmap=cmap)
+# plot2.xaxis.set_major_formatter(matplotlib.dates.DateFormatter("%d %b"))
+# plot2.set_ylabel('Depth (m)',fontsize=50)
+# 
+# cmap=plt.cm.get_cmap('RdYlBu_r',8)
+# plot3.contourf(M1timeofmeasurement[1872:2808,20:160],M1depth[1872:2808,20:160],M1backscatallint.iloc[1872:2808,20:160],np.linspace(round(np.min(np.min(M1backscatallint.iloc[:,20:160])),1),round(np.max(np.max(M1backscatallint.iloc[:,20:160])),1),11),cmap=cmap)
+# plot3.xaxis.set_major_formatter(matplotlib.dates.DateFormatter("%d %b"))
+# plot3.set_ylabel('Depth (m)',fontsize=50)
+# 
+# cmap=plt.cm.get_cmap('RdYlBu_r',8)
+# plot4.contourf(M1timeofmeasurement[2808:3744,20:160],M1depth[2808:3744,20:160],M1backscatallint.iloc[2808:3744,20:160],np.linspace(round(np.min(np.min(M1backscatallint.iloc[:,20:160])),1),round(np.max(np.max(M1backscatallint.iloc[:,20:160])),1),11),cmap=cmap)
+# plot4.xaxis.set_major_formatter(matplotlib.dates.DateFormatter("%d %b"))
+# plot4.set_ylabel('Depth (m)',fontsize=50)
+# 
+# cmap=plt.cm.get_cmap('RdYlBu_r',8)
+# plot5.contourf(M1timeofmeasurement[3744:4680,20:160],M1depth[3744:4680,20:160],M1backscatallint.iloc[3744:4680,20:160],np.linspace(round(np.min(np.min(M1backscatallint.iloc[:,20:160])),1),round(np.max(np.max(M1backscatallint.iloc[:,20:160])),1),11),cmap=cmap)
+# plot5.xaxis.set_major_formatter(matplotlib.dates.DateFormatter("%d %b"))
+# plot5.set_ylabel('Depth (m)',fontsize=50)
+# 
+# cmap=plt.cm.get_cmap('RdYlBu_r',8)
+# plot6.contourf(M1timeofmeasurement[4680:5616,20:160],M1depth[4680:5616,20:160],M1backscatallint.iloc[4680:5616,20:160],np.linspace(round(np.min(np.min(M1backscatallint.iloc[:,20:160])),1),round(np.max(np.max(M1backscatallint.iloc[:,20:160])),1),11),cmap=cmap)
+# plot6.xaxis.set_major_formatter(matplotlib.dates.DateFormatter("%d %b"))
+# plot6.set_ylabel('Depth (m)',fontsize=50)
+# 
+# cmap=plt.cm.get_cmap('RdYlBu_r',8)
+# plot7.contourf(M1timeofmeasurement[5616:6552,20:160],M1depth[5616:6552,20:160],M1backscatallint.iloc[5616:6552,20:160],np.linspace(round(np.min(np.min(M1backscatallint.iloc[:,20:160])),1),round(np.max(np.max(M1backscatallint.iloc[:,20:160])),1),11),cmap=cmap)
+# plot7.xaxis.set_major_formatter(matplotlib.dates.DateFormatter("%d %b"))
+# plot7.set_ylabel('Depth (m)',fontsize=50)
+# 
+# cmap=plt.cm.get_cmap('RdYlBu_r',8)
+# plot8.contourf(M1timeofmeasurement[6552:,20:160],M1depth[6552:,20:160],M1backscatallint.iloc[6552:,20:160],np.linspace(round(np.min(np.min(M1backscatallint.iloc[:,20:160])),1),round(np.max(np.max(M1backscatallint.iloc[:,20:160])),1),11),cmap=cmap)
+# plot8.set_xlabel('Time (day month)', fontsize=50)
+# plot8.xaxis.set_major_formatter(matplotlib.dates.DateFormatter("%d %b"))
+# plot8.set_ylabel('Depth (m)',fontsize=50)
+# plot8.invert_yaxis()
+# cbar=plt.cm.ScalarMappable(cmap=cmap)
+# cbar.set_array(M1backscatallint.iloc[:,20:165])
+# cbar.set_clim(np.min(np.min(M1backscatallint.iloc[:,20:165])),np.max(np.max(M1backscatallint.iloc[:,20:165])))
+# b=plt.colorbar(cbar,boundaries=np.linspace(round(np.min(np.min(M1backscatallint.iloc[:,20:165])),1),round(np.max(np.max(M1backscatallint.iloc[:,20:165])),1),11),ax=[plot8], location='bottom', shrink=0.5)
+# b.set_label(label='Normalized backscatter (0-1)', fontsize=80)
+# 
+# plt.rc('xtick',labelsize=60)
+# plt.rc('ytick',labelsize=60)
+# 
+# plt.savefig('01_Plots/10_Final/KM1 backscatter overview.png')
+# 
+# plt.close(a)
+# 
+# 
+# ##M2
+# a, [plot1, plot2, plot3, plot4, plot5, plot6, plot7, plot8]= plt.subplots(8,1, sharex=False,sharey=True, figsize=(60,80),constrained_layout=True)
+# 
+# cmap=plt.cm.get_cmap('RdYlBu_r',8)
+# plot1.contourf(M2timeofmeasurement[0:936,20:135],M2depth[0:936,20:135],M2backscatallint.iloc[0:936,20:135],np.linspace(round(np.min(np.min(M2backscatallint.iloc[:,20:135])),1),round(np.max(np.max(M2backscatallint.iloc[:,20:135])),1),11),cmap=cmap)
+# plot1.xaxis.set_major_formatter(matplotlib.dates.DateFormatter("%d %b"))
+# plot1.set_ylabel('Depth (m)',fontsize=50)
+# 
+# cmap=plt.cm.get_cmap('RdYlBu_r',8)
+# plot2.contourf(M2timeofmeasurement[936:1872,20:135],M2depth[936:1872,20:135],M2backscatallint.iloc[936:1872,20:135],np.linspace(round(np.min(np.min(M2backscatallint.iloc[:,20:135])),1),round(np.max(np.max(M2backscatallint.iloc[:,20:135])),1),11),cmap=cmap)
+# plot2.xaxis.set_major_formatter(matplotlib.dates.DateFormatter("%d %b"))
+# plot2.set_ylabel('Depth (m)',fontsize=50)
+# 
+# cmap=plt.cm.get_cmap('RdYlBu_r',8)
+# plot3.contourf(M2timeofmeasurement[1872:2808,20:135],M2depth[1872:2808,20:135],M2backscatallint.iloc[1872:2808,20:135],np.linspace(round(np.min(np.min(M2backscatallint.iloc[:,20:135])),1),round(np.max(np.max(M2backscatallint.iloc[:,20:135])),1),11),cmap=cmap)
+# plot3.xaxis.set_major_formatter(matplotlib.dates.DateFormatter("%d %b"))
+# plot3.set_ylabel('Depth (m)',fontsize=50)
+# 
+# cmap=plt.cm.get_cmap('RdYlBu_r',8)
+# plot4.contourf(M2timeofmeasurement[2808:3744,20:135],M2depth[2808:3744,20:135],M2backscatallint.iloc[2808:3744,20:135],np.linspace(round(np.min(np.min(M2backscatallint.iloc[:,20:135])),1),round(np.max(np.max(M2backscatallint.iloc[:,20:135])),1),11),cmap=cmap)
+# plot4.xaxis.set_major_formatter(matplotlib.dates.DateFormatter("%d %b"))
+# plot4.set_ylabel('Depth (m)',fontsize=50)
+# 
+# cmap=plt.cm.get_cmap('RdYlBu_r',8)
+# plot5.contourf(M2timeofmeasurement[3744:4680,20:135],M2depth[3744:4680,20:135],M2backscatallint.iloc[3744:4680,20:135],np.linspace(round(np.min(np.min(M2backscatallint.iloc[:,20:135])),1),round(np.max(np.max(M2backscatallint.iloc[:,20:135])),1),11),cmap=cmap)
+# plot5.xaxis.set_major_formatter(matplotlib.dates.DateFormatter("%d %b"))
+# plot5.set_ylabel('Depth (m)',fontsize=50)
+# 
+# cmap=plt.cm.get_cmap('RdYlBu_r',8)
+# plot6.contourf(M2timeofmeasurement[4680:5616,20:135],M2depth[4680:5616,20:135],M2backscatallint.iloc[4680:5616,20:135],np.linspace(round(np.min(np.min(M2backscatallint.iloc[:,20:135])),1),round(np.max(np.max(M2backscatallint.iloc[:,20:135])),1),11),cmap=cmap)
+# plot6.xaxis.set_major_formatter(matplotlib.dates.DateFormatter("%d %b"))
+# plot6.set_ylabel('Depth (m)',fontsize=50)
+# 
+# cmap=plt.cm.get_cmap('RdYlBu_r',8)
+# plot7.contourf(M2timeofmeasurement[5616:6552,20:135],M2depth[5616:6552,20:135],M2backscatallint.iloc[5616:6552,20:135],np.linspace(round(np.min(np.min(M2backscatallint.iloc[:,20:135])),1),round(np.max(np.max(M2backscatallint.iloc[:,20:135])),1),11),cmap=cmap)
+# plot7.xaxis.set_major_formatter(matplotlib.dates.DateFormatter("%d %b"))
+# plot7.set_ylabel('Depth (m)',fontsize=50)
+# 
+# cmap=plt.cm.get_cmap('RdYlBu_r',8)
+# plot8.contourf(M2timeofmeasurement[6552:,20:135],M2depth[6552:,20:135],M2backscatallint.iloc[6552:,20:135],np.linspace(round(np.min(np.min(M2backscatallint.iloc[:,20:135])),1),round(np.max(np.max(M2backscatallint.iloc[:,20:135])),1),11),cmap=cmap)
+# plot8.set_xlabel('Time (day month)', fontsize=50)
+# plot8.xaxis.set_major_formatter(matplotlib.dates.DateFormatter("%d %b"))
+# plot8.set_ylabel('Depth (m)',fontsize=50)
+# plot8.invert_yaxis()
+# cbar=plt.cm.ScalarMappable(cmap=cmap)
+# cbar.set_array(M2backscatallint.iloc[:,20:165])
+# cbar.set_clim(np.min(np.min(M2backscatallint.iloc[:,20:135])),np.max(np.max(M2backscatallint.iloc[:,20:135])))
+# b=plt.colorbar(cbar,boundaries=np.linspace(round(np.min(np.min(M2backscatallint.iloc[:,20:135])),1),round(np.max(np.max(M2backscatallint.iloc[:,20:135])),1),11),ax=[plot8], location='bottom', shrink=0.5)
+# b.set_label(label='Normalized backscatter (0-1)', fontsize=80)
+# 
+# plt.rc('xtick',labelsize=60)
+# plt.rc('ytick',labelsize=60)
+# 
+# plt.savefig('01_Plots/10_FINAL/KM2 backscatter overview.png')
+# 
+# plt.close(a)
+# 
+# =============================================================================
+
+#7 Short term sediment trap zooplankton
+# =============================================================================
+# fig, a=plt.subplots(figsize=(10,5),constrained_layout=True)
+# a.set_title('Zooplankton flux',fontsize=20,fontweight='bold')
+# a.bar(SSdates[0,0:8],SSzooplanktontot.iloc[2,2:10],width=20.0,label='0-100m',color='r')
+# a.bar(SSdates[0,0:8],SSzooplanktontot.iloc[0,2:10],width=20.0,label='0-50m',color='b')
+# a.bar(SSdates[0,0:8],SSzooplanktontot.iloc[1,2:10],width=20.0,bottom=SSzooplanktontot.iloc[0,2:10], label='50-100m',color='black')
+# a.set_xlabel('Date (month year)', fontsize=15)
+# a.set_ylabel('$individuals/m^2/d$',fontsize=15)
+# a.xaxis.set_major_formatter(matplotlib.dates.DateFormatter("%b %Y"))
+# a.legend(fontsize=20)
+# plt.rc('xtick',labelsize=12)
+# plt.rc('ytick',labelsize=12)
+# =============================================================================
+
+
+#8 Short term sedimen trap correlation
+# =============================================================================
+# a, [plot1, plot2]= plt.subplots(2,1, sharex=True,sharey=False, figsize=(15,10),constrained_layout=True)
+# 
+# plot1.scatter(SSBackscatM1[:,0],SSPOCfluxplot[str('20m')][:],c='r', label='20m KM1',s=300)
+# plot1.scatter(SSBackscatM1[:,1],SSPOCfluxplot[str('30m')][:],c='#4B8BBE', label='30m KM1',s=300)
+# plot1.scatter(SSBackscatM1[:,2],SSPOCfluxplot[str('50m')][:],c='y', label='50m KM1',s=300)
+# plot1.scatter(SSBackscatM1[:,3],SSPOCfluxplot[str('90m')][:],c='grey', label='90m KM1',s=300)
+# plot1.scatter(SSBackscatM2[:,0],SSPOCfluxplot[str('20m')][:],c='r',marker='v', label='20m KM2',s=300)
+# plot1.scatter(SSBackscatM2[:,1],SSPOCfluxplot[str('30m')][:],c='#4B8BBE',marker='v', label='30m KM2',s=300)
+# plot1.scatter(SSBackscatM2[:,2],SSPOCfluxplot[str('50m')][:],c='y',marker='v', label='50m KM2',s=300)
+# plot1.scatter(SSBackscatM2[:,3],SSPOCfluxplot[str('90m')][:],c='grey',marker='v', label='90m KM2',s=300)
+# plot1.set_title('Normalized backscatter vs. POC-flux', fontsize=20, fontweight='bold')
+# plot1.set_ylabel('POC-flux $(mg/m^2/d)$', fontsize=20)
+# plot1.set_xlim(0,24)
+# plot1.legend(fontsize=20)
+# x = np.concatenate((SSBackscatM1[:,0],SSBackscatM1[:,1],SSBackscatM1[:,2],SSBackscatM1[:,3],
+#                    SSBackscatM2[:,0],SSBackscatM2[:,1],SSBackscatM2[:,2],SSBackscatM2[:,3]))
+# y=np.concatenate((SSPOCfluxplot[str('20m')][:],SSPOCfluxplot[str('30m')][:],SSPOCfluxplot[str('50m')][:],SSPOCfluxplot[str('90m')][:],SSPOCfluxplot[str('20m')][:],SSPOCfluxplot[str('30m')][:],SSPOCfluxplot[str('50m')][:],SSPOCfluxplot[str('90m')][:]))
+# z=np.poly1d(np.polyfit(x,y,1))
+# 
+# for i, txt in enumerate(SSdates1):
+#     plot1.annotate(datetime.datetime.strptime(txt, '%Y-%m-%d %H:%M:%S').strftime('%m/%y'), (SSBackscatM1[i,0], SSPOCfluxplot[str('20m')][i]))
+#     plot1.annotate(datetime.datetime.strptime(txt, '%Y-%m-%d %H:%M:%S').strftime('%m/%y'), (SSBackscatM1[i,1], SSPOCfluxplot[str('30m')][i]))
+#     plot1.annotate(datetime.datetime.strptime(txt, '%Y-%m-%d %H:%M:%S').strftime('%m/%y'), (SSBackscatM1[i,2], SSPOCfluxplot[str('50m')][i]))
+#     plot1.annotate(datetime.datetime.strptime(txt, '%Y-%m-%d %H:%M:%S').strftime('%m/%y'), (SSBackscatM1[i,3], SSPOCfluxplot[str('90m')][i]))
+#     plot1.annotate(datetime.datetime.strptime(txt, '%Y-%m-%d %H:%M:%S').strftime('%m/%y'), (SSBackscatM2[i,0], SSPOCfluxplot[str('20m')][i]))
+#     plot1.annotate(datetime.datetime.strptime(txt, '%Y-%m-%d %H:%M:%S').strftime('%m/%y'), (SSBackscatM2[i,1], SSPOCfluxplot[str('30m')][i]))
+#     plot1.annotate(datetime.datetime.strptime(txt, '%Y-%m-%d %H:%M:%S').strftime('%m/%y'), (SSBackscatM2[i,2], SSPOCfluxplot[str('50m')][i]))
+#     plot1.annotate(datetime.datetime.strptime(txt, '%Y-%m-%d %H:%M:%S').strftime('%m/%y'), (SSBackscatM2[i,3], SSPOCfluxplot[str('90m')][i]))
+# 
+# plot1.plot(x,z(x),'m-')
+# plot1.text(20.1,60, ('$r^2 =$ ' + str(round((scipy.stats.linregress(x, y).rvalue**2),3))), fontsize=20)
+# plot1.text(20.1,40, ('p-value = ' + str(round((scipy.stats.linregress(x, y).pvalue),3))),fontsize=20)
+# plot1.grid()
+# 
+# plot2.scatter(SSBackscatM1[:,0],SSChlafluxplot[str('20m')][:],c='r', label='20m KM1',s=300)
+# plot2.scatter(SSBackscatM1[:,1],SSChlafluxplot[str('30m')][:],c='#4B8BBE', label='30m KM1',s=300)
+# plot2.scatter(SSBackscatM1[:,2],SSChlafluxplot[str('50m')][:],c='y', label='50m KM1',s=300)
+# plot2.scatter(SSBackscatM1[:,3],SSChlafluxplot[str('90m')][:],c='grey', label='90m KM1',s=300)
+# plot2.scatter(SSBackscatM2[:,0],SSChlafluxplot[str('20m')][:],c='r',marker='v', label='20m KM2',s=300)
+# plot2.scatter(SSBackscatM2[:,1],SSChlafluxplot[str('30m')][:],c='#4B8BBE',marker='v', label='30m KM2',s=300)
+# plot2.scatter(SSBackscatM2[:,2],SSChlafluxplot[str('50m')][:],c='y',marker='v', label='50m KM2',s=300)
+# plot2.scatter(SSBackscatM2[:,3],SSChlafluxplot[str('90m')][:],c='grey',marker='v', label='90m KM2',s=300)
+# plot2.set_title('Normalized backscatter vs. Chla-flux', fontsize=20, fontweight='bold')
+# plot2.set_ylabel('Chla-flux $(mg/m^2/d)$', fontsize=20)
+# plot2.set_xlabel('Normalized backscatter (0-24)', fontsize=20)
+# plot2.set_xlim(0,24)
+# plot2.legend(fontsize=20)
+# x = np.concatenate((SSBackscatM1[:,0],SSBackscatM1[:,1],SSBackscatM1[:,2],SSBackscatM1[:,3],
+#                    SSBackscatM2[:,0],SSBackscatM2[:,1],SSBackscatM2[:,2],SSBackscatM2[:,3]))
+# y=np.concatenate((SSChlafluxplot[str('20m')][:],SSChlafluxplot[str('30m')][:],SSChlafluxplot[str('50m')][:],SSChlafluxplot[str('90m')][:],SSChlafluxplot[str('20m')][:],SSChlafluxplot[str('30m')][:],SSChlafluxplot[str('50m')][:],SSChlafluxplot[str('90m')][:]))
+# z=np.poly1d(np.polyfit(x,y,1))
+# 
+# for i, txt in enumerate(SSdates1):
+#     plot2.annotate(datetime.datetime.strptime(txt, '%Y-%m-%d %H:%M:%S').strftime('%m/%y'), (SSBackscatM1[i,0], SSChlafluxplot[str('20m')][i]),fontsize=10)
+#     plot2.annotate(datetime.datetime.strptime(txt, '%Y-%m-%d %H:%M:%S').strftime('%m/%y'), (SSBackscatM1[i,1], SSChlafluxplot[str('30m')][i]),fontsize=10)
+#     plot2.annotate(datetime.datetime.strptime(txt, '%Y-%m-%d %H:%M:%S').strftime('%m/%y'), (SSBackscatM1[i,2], SSChlafluxplot[str('50m')][i]),fontsize=10)
+#     plot2.annotate(datetime.datetime.strptime(txt, '%Y-%m-%d %H:%M:%S').strftime('%m/%y'), (SSBackscatM1[i,3], SSChlafluxplot[str('90m')][i]),fontsize=10)
+#     plot2.annotate(datetime.datetime.strptime(txt, '%Y-%m-%d %H:%M:%S').strftime('%m/%y'), (SSBackscatM2[i,0], SSChlafluxplot[str('20m')][i]),fontsize=10)
+#     plot2.annotate(datetime.datetime.strptime(txt, '%Y-%m-%d %H:%M:%S').strftime('%m/%y'), (SSBackscatM2[i,1], SSChlafluxplot[str('30m')][i]),fontsize=10)
+#     plot2.annotate(datetime.datetime.strptime(txt, '%Y-%m-%d %H:%M:%S').strftime('%m/%y'), (SSBackscatM2[i,2], SSChlafluxplot[str('50m')][i]),fontsize=10)
+#     plot2.annotate(datetime.datetime.strptime(txt, '%Y-%m-%d %H:%M:%S').strftime('%m/%y'), (SSBackscatM2[i,3], SSChlafluxplot[str('90m')][i]),fontsize=10)
+# plot2.plot(x,z(x),'m-')
+# plot2.text(20.1,0.4, ('$r^2 =$ ' + str(round((scipy.stats.linregress(x, y).rvalue**2),3))), fontsize=20)
+# plot2.text(20.1,0, ('p-value = ' + str(round((scipy.stats.linregress(x, y).pvalue),3))), fontsize=20)
+# plot2.grid()
+# 
+# plt.rc('xtick',labelsize=20)
+# plt.rc('ytick',labelsize=20)
+# 
+# a.show()
+# 
+# =============================================================================
