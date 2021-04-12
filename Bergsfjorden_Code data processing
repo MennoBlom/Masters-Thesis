@@ -135,7 +135,6 @@ for i in range(len(Time)):
     
     Depthbincol1[:,i]=np.arange((Depth[i]-Blankingdistance),(Depth[i]-len(Binscol1)*Binsize-Blankingdistance),Binsize*-1)
     
-    
     i=i+1
     
 #Make density
@@ -234,6 +233,7 @@ for i in range(len(Time)):          #per unit of time
 #                    
 # =============================================================================
         j=j+1
+        
     i=i+1
     
 #2.4 Taking movement out of the ADCP THIS WORKS
@@ -352,7 +352,6 @@ for i in range(len(Time)):  #Within that loop do for each week
 # plt.ylabel('Depth')
 # plt.gca().invert_yaxis()
 # plt.legend()
-# 
 # =============================================================================
 
 #2.6 interpolate all the datasets that are being lowpassed
@@ -643,8 +642,7 @@ for j in range (len(Weeks)-1):
         avvertvelday=np.zeros((len(halfhours),len(Watercolumn)),dtype='float')
    
         for i in range(len(halfhours)):
-            
-                
+        
             if i <=22:      
                 houraverage=((Backscatweek[j][i+0*48,:]+
                               Backscatweek[j][i+1*48,:]+
