@@ -35,8 +35,8 @@ Precipitation=pd.read_csv('Kaldfjorden weather_precipitation.csv', sep=';', erro
 Radiation=pd.read_csv('Kaldfjorden weather_solar radiance.csv', sep=',',error_bad_lines=False)
 Radiation.iloc[:,1]=Radiation.iloc[:,1]
 
+#Time solar radiation
 Timerad=np.zeros((len(Radiation.iloc[:,1])),dtype='datetime64[s]')
-
 for i in range(len(Radiation)):
 
     if len(str(Radiation.iloc[i,1])) == 1: 
@@ -181,7 +181,6 @@ bv = 0.29  #regression coefficient depends on type of arisol and spectral range,
 bo = 0.57  #regression coefficient depends on type of arisol and spectral range, try 100% lambda 250 - 4000 + continental arosol
 r= 0.4 #Iqbal p.286. Figure 9.3.2. Smooth SEA surface reflectance
 V= 23 #surface visibility (km) ASSUMPTION
-
 
 for i in range(len(days)):
     
