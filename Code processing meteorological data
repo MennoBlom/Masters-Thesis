@@ -1,9 +1,18 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Sat Dec 12 16:59:50 2020
+#Kaldfjorden
+1. Import csv
+2. Temperature
+3. Wind
+4. Precipitation
+5. Export data
 
-@author: Menno
-"""
+#Bergsfjorden
+1. Import csv
+2. Temperature
+3. Wind
+4. Computation of solar radiation
+5. Export data
+
+#Import packages
 import scipy.io
 import scipy.interpolate
 import numpy as np
@@ -17,7 +26,6 @@ from matplotlib import cm
 import datetime
 import gsw
 import pickle
-
 
 #KALDFJORDEN
 #Import csv
@@ -53,7 +61,6 @@ for i in range(len(Radiation)):
     
     i=i+1
 
-#This is the Radiation per minute.
 a=Radiation.iloc[:,2]
 a.index=Timerad
 
@@ -62,7 +69,6 @@ Rad_time_M1=Timerad[55358:501916]
 Rad_M2=a[55658:501916]
 Rad_time_M2=Timerad[55658:501916]
 
-#why do the datasets have a different length
 #Times kaldfjorden
 #Mooring 1 start: ...., end:....
 #Mooring 2 start: ...., end:....
@@ -79,7 +85,6 @@ WTempMasviktime=pd.to_datetime(Temperature.iloc[18442:25928,2], format='%d.%m.%Y
 WWindHekfyrtime=pd.to_datetime(Wind.iloc[924:8409,2], format='%d.%m.%Y %H:%M')
 WWindHekfyr=Wind.iloc[924:8409,3]
 WWinddirHekfyr=Wind.iloc[924:8409,4]
-
 WWindLangnestime=pd.to_datetime(Wind.iloc[9684:17156,2], format='%d.%m.%Y %H:%M')
 WWindLangnes=Wind.iloc[9684:17156,3]
 WWinddirLangnes=Wind.iloc[9684:17156,4]
@@ -133,7 +138,6 @@ WindHasvik=Wind.iloc[0:5111,4]
 WinddirHasvik=Wind.iloc[0:5111,3]
 
 #Computation of solar radiation -> Frouin
-
 #Make datafiles
 days=np.arange(1,366,1/24)                            #day number of the year
 months=np.arange(1,366,31)
@@ -209,107 +213,6 @@ for i in range(len(days)):
 
 I[np.isnan(I)] = 0
 
-#CHECKING IF FRUOIN FORMULA WORKS, IT WORKS NOW!!! WOOOHOOO    
-# =============================================================================
-# i=1450
-# print(ddo[0,i])
-# print(zen[0,i])
-# print(Uv[0,i])
-# print(Uo_hourly[i])
-# print(I[0,i])
-# print(I0 * ((ddo[0,i])**2)*(np.cos(zen[0,i]*((np.exp(-1*(a+(b/V))/np.cos(zen[0,i])))/(1-r*(ai + bi/V))))) * (np.exp(-1*av *(Uv[0,i]/np.cos(zen[0,i]))*np.exp(bv))) * (np.exp(-1*ao *(Uo_hourly[i]/np.cos(zen[0,i]))*np.exp(bv))))#Irradiance between wavelength lambda1 and lambda2.
-# 
-# #CHECK print(I0 * ((ddo[0,i])**2))#Irradiance between wavelength lambda1 and lambda2.
-# 
-# #CHECK print(-1*((a+b)/V))
-# #CHECK print(np.cos(np.deg2rad(zen[0,i])))
-# 
-# #CHECK print((-1*((a+b)/V))/np.cos(np.deg2rad(zen[0,i])))
-# #CHECK print(np.exp((-1*((a+b)/V))/np.cos(np.deg2rad(zen[0,i]))))
-# 
-# #CHECK print(1-r*((ai + bi)/V))
-# 
-# #CHECK print((np.exp((-1*((a+b)/V))/np.cos(np.deg2rad(zen[0,i]))))/(1-r*((ai + bi)/V)))
-# 
-# #CHECK print(np.cos(np.deg2rad(zen[0,i]))*((np.exp((-1*((a+b)/V))/np.cos(np.deg2rad(zen[0,i]))))/(1-r*((ai + bi)/V)))) 
-#     
-# #CHECK print(np.exp(-1*av *(Uv[0,i]/np.cos(np.deg2rad(zen[0,i])))**(bv)))
-# 
-# #CHECK print((np.exp(-1*ao *(Uo_hourly[i]/np.cos(np.deg2rad(zen[0,i])))**(bo))))
-# 
-#   
-# #CHECK, IT WORKS!!
-# # =============================================================================
-# # print((I0 * ((ddo[0,i])**2))*\
-# #       (np.cos(np.deg2rad(zen[0,i]))*((np.exp((-1*((a+b)/V))/np.cos(np.deg2rad(zen[0,i]))))/(1-r*((ai + bi)/V))))\
-# #       *(np.exp(-1*av *(Uv[0,i]/np.cos(np.deg2rad(zen[0,i])))**(bv)))\
-# #           *((np.exp(-1*ao *(Uo_hourly[i]/np.cos(np.deg2rad(zen[0,i])))**(bo)))))
-# # 
-# # =============================================================================
-# 
-# =============================================================================
-#Make solar time
-start=datetime.datetime(2020,1,1,0,0)
-
-Solartime=np.zeros((1,len(I[0,:])),dtype='datetime64[m]')
-
-for i in range(len(I[0,:])):
-    
-    Solartime[0,i] = start + datetime.timedelta(hours=i)
-    
-    i=i+1
-
-#Calculate sunrise and sunset for each day of the year
-day=np.arange(1,366,1)                            #day number of the year
-ws=np.zeros((1,len(day)), dtype='float')            #Ratio between distance of the sun and mean of distance between sun and earth
-daysun=np.zeros((4,len(day)), dtype='float')            #Ratio between distance of the sun and mean of distance between sun and earth
-daysun[0,:]=day
-datesun=np.zeros((3,len(day)), dtype='datetime64[h]') 
-datesun[0,:]=pd.to_datetime(pd.date_range("2020-01-02 00:00", "2020-12-31 00:00", freq="1d").strftime('%Y-%m-%d %H:%M'))
-#     Threedays[i,0]=np.datetime64(Starttime)+np.timedelta64(i,'3D')
-#     Threedays[i,1]=np.datetime64(Starttime)+np.timedelta64(i+1,'3D')-np.timedelta64(1,'h')
-
-i=2
-for i in range(len(day)):
-
-    angle=(2*np.pi*(day[i]-1))/365 #Iqbal p.3 formula 1.2.2
-        
-    #ddo= 1.000110 + (0.034221*np.cos(angle)) + (0.001280*np.sin(angle)) + (0.000719*np.cos(2*angle)) + (0.000077*np.sin(angle)) #Iqbal p.3 formule 1.2.1 Ratio of actual to mean Earth- Sun separation
-    
-    #hourly
-    declination = (0.006918 - 0.399912 * np.cos(angle) + 0.070257 *np.sin(angle) 
-                        - 0.006758* np.cos(2*angle) + 0.000907 *np.sin(2*angle)
-                        - 0.002697 *np.cos(3*angle) + 0.00148 *np.sin(3*angle))* (180/np.pi) #Iqbal  p.7 formula 1.3.1 in radians ( * 180/np.pi) to convert to degrees
-
-    
-    ws[0,i]=(np.arccos(-1*np.tan(np.deg2rad(latitude))*np.tan(np.deg2rad(declination))))*(180/np.pi) #Iqbal p.16 formula 1.5.4, sunrise hour angle
-    
-    daysun[1,i]=12-ws[0,i]/15 #Time of sunrise
-    
-    daysun[2,i]=12+ws[0,i]/15 #Time of sunrise
-    
-    if pd.notna(daysun[1,i]) is True :
-        datesun[1,i]=datesun[0,i] + pd.to_timedelta(daysun[1,i], unit='h')
-        datesun[2,i]=datesun[0,i] + pd.to_timedelta(daysun[2,i], unit='h')
-
-    if pd.notna(daysun[1,i]) is False :
-        datesun[1,i]=datesun[0,i]
-        datesun[2,i]=datesun[0,i] 
-        
-    daysun[3,i]=(2/15)*ws[0,i] #Hours of sunlight per day
-    
-    i=i+1
-
-# =============================================================================
-# plt.plot(daysun[2,:])
-# plt.plot(datesun[1,200:210],daysun[1,200:210],'o')
-# plt.plot(datesun[2,200:210],daysun[2,200:210],'o')
-# plt.plot(daysun[3,:])
-# print(str(datesun[1,:]))
-# 
-# =============================================================================
-
-
 # =============================================================================
 # Bweatherdict={             
 #                     'Wind_Hasvik':WindHasvik,
@@ -328,83 +231,3 @@ for i in range(len(day)):
 # pickle_out.close()
 # 
 # =============================================================================
-
-
-##TRY THE SAME FOR KALDFJORDEN TO VERIFY THE METHOD??? SHOULD BE FAIRLY STRAIGHT FORWARD
-#Make datafiles
-days=np.arange(1,366,1/24)                            #day number of the year
-months=np.arange(1,366,31)
-angle=np.zeros((2,len(days)), dtype='float')       #Angle of the sun at each day. p.11 Iqbal 1.2.2
-hourangle=np.arange(180,-180,-15)                      #Angle of the sun as opposed to the 
-#hourangle=np.arange(15,375,15)                      #Angle of the sun as opposed to the 
-for i in range(int(len(days)/24)):
-    
-    angle[1,24*i:24*i+24]=hourangle# / (180/np.pi) for radians
-    i=i+1
-
-ddo=np.zeros((1,len(days)), dtype='float')            #Ratio between distance of the sun and mean of distance between sun and earth
-declination= np.zeros((1,len(days)), dtype='float')   #Declination of the sun at each day. p.15 Iqbal 1.3.1
-zen=np.zeros((1,len(days)), dtype='float')            #Senith angle hourly
-Uv=np.zeros((1,len(days)), dtype='float')             #amount of precipitable water in the atmosphere (cm) 
-I=np.zeros((1,len(days)), dtype='float')            #Solar irradiance
-
-#Site specific parameters
-latitude = 69.75# / (180/np.pi) for radians #latitude Bergsfjorden
-#latitude = 40.78330492607448 / (180/np.pi) # latitude New York in radians
-#declination = -8.66749475066716 / (180/np.pi)
-#hourangle = 15 /  (180/np.pi)
-Uo_monthly = [0.34, 0.40, 0.46, 0.42, 0.40, 0.36, 0.34, 0.31, 0.29, 0.28, 0.29, 0.31] #Iqbal p.89 Table 5.3.2 70N. Montly ozone concentration in the air
-Uo_hourly = np.interp(days,months,Uo_monthly)
-
-humidity_monthly = [0.68,0.70,0.70,0.67,0.65,0.69,0.73,0.83,0.80,0.79,0.70,0.71]# seklima.met.no Nuvsvåg weather station monthly humidity
-humidity_hourly = np.interp(days,months,humidity_monthly)
-
-Temp_monthly = [-1.3+273.15, -1.5+273.15, -1.7+273.15, 0.2+273.15, 4+273.15, 8.9+273.15, 13.1+273.15, 11.2+273.15, 8.6+273.15, 4.5+273.15, 3.2+273.15, -0.4+273.15]# seklima.met.no Nuvsvåg weather station monthly temp in Kelvin
-Temp_hourly = np.interp(days,months,Temp_monthly)
-
-#Standardized parameters
-I0=  1355.49 #Iqbal p.47 (SUM I0 - lambda 4000) Monochromatic extraterrestrial irradiance between wavelength lambda1 and lambda2
-a  = 0.066 #regression coefficient depends on type of arisol and spectral range, try 100% lambda 250 - 4000 + continental arosol
-ai = 0.088 #regression coefficient depends on type of arisol and spectral range, try 100% lambda 250 - 4000 + continental arosol
-av = 0.102 #regression coefficient depends on type of arisol and spectral range, try 100% lambda 250 - 4000 + continental arosol
-ao = 0.041 #regression coefficient depends on type of arisol and spectral range, try 100% lambda 250 - 4000 + continental arosol
-b  = 0.704 #regression coefficient depends on type of arisol and spectral range, try 100% lambda 250 - 4000 + continental arosol
-bi = 0.456 #regression coefficient depends on type of arisol and spectral range, try 100% lambda 250 - 4000 + continental arosol
-bv = 0.29  #regression coefficient depends on type of arisol and spectral range, try 100% lambda 250 - 4000 + continental arosol
-bo = 0.57  #regression coefficient depends on type of arisol and spectral range, try 100% lambda 250 - 4000 + continental arosol
-r= 0.4 #Iqbal p.286. Figure 9.3.2. Smooth SEA surface reflectance
-V= 23 #surface visibility (km) ASSUMPTION
-
-
-for i in range(len(days)):
-    
-    #CORRECT
-    c=(2*np.pi*(days[i]-1))/365 #Iqbal p.3 formula 1.2.2
-    angle[0,i]=c
-    
-    #CORRECT
-    ddo[0,i]= 1.000110 + (0.034221*np.cos(c)) + (0.001280*np.sin(c)) + (0.000719*np.cos(2*c)) + (0.000077*np.sin(c)) #Iqbal p.3 formule 1.2.1 Ratio of actual to mean Earth- Sun separation
-    
-    #CORRECT
-    declination[0,i] = (0.006918 - 0.399912 * np.cos(c) + 0.070257 *np.sin(c) 
-                        - 0.006758* np.cos(2*c) + 0.000907 *np.sin(2*c)
-                        - 0.002697 *np.cos(3*c) + 0.00148 *np.sin(3*c))* (180/np.pi) #Iqbal  p.7 formula 1.3.1 in radians ( * 180/np.pi) to convert to degrees
-    
-    #CORRECT
-    zen[0,i] = math.acos((np.sin(np.deg2rad(declination[0,i]))*np.sin(np.deg2rad(latitude)))+(np.cos(np.deg2rad(declination[0,i]))*np.cos(np.deg2rad(latitude))*np.cos(np.deg2rad(angle[1,i]))))*(180/np.pi) #Iqbal p.15-17 formula 1.5.1 zenith angle of the sun in degrees
-
-    #CORRECT
-    Uv[0,i] = (0.493*humidity_hourly[i]*(np.exp(26.23 - 5416/Temp_hourly[i])))/Temp_hourly[i] #Iqbal p.94 formula 5.4.6 and 5.4.7. amount of precipitable water in the atmosphere (cm) 
-
-    #CHECK THIS
-    I[0,i] = ((I0 * ((ddo[0,i])**2))\
-            *(np.cos(np.deg2rad(zen[0,i]))*((np.exp((-1*((a+b)/V))/np.cos(np.deg2rad(zen[0,i]))))/(1-r*((ai + bi)/V))))\
-            *(np.exp(-1*av *(Uv[0,i]/np.cos(np.deg2rad(zen[0,i])))**(bv)))\
-            *((np.exp(-1*ao *(Uo_hourly[i]/np.cos(np.deg2rad(zen[0,i])))**(bo)))))#Irradiance between wavelength lambda1 and lambda2.
-        
-    i=i+1
-
-I[np.isnan(I)] = 0
-
-plt.plot(Rad_time_M1,Rad_M1)
-plt.plot(days,I[0,:])
