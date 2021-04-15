@@ -9,7 +9,7 @@
 #   2.4 Vertical movement filter ADCP
 #   2.5 Determination TVG
 #   2.6 interpolation
-#   2.7 Fast Forier Transformation -> what patterns visible?
+#   2.7 Fast Forier Transformation -> what patterns are visible?
 # 3. Making data presentable
 #   3.1 Filters, lowpassed, bandpass filter.
 #   3.2 Vertical velocity anomaly
@@ -119,15 +119,15 @@ Tidepres=mat['data'].TidePressure[3:7960]
 Airsaturation=mat['data'].AirSaturation[3:7960]
 Conductivity=mat['data'].Conductivity[3:7960]
 
-#CHAPTER 2. DATA CLEANING_____________________________________________________________________________
-#Layout
+#Section 3.2.1 in the thesis - ADCP data processing_________________________________________________________________________________________________________________________
+#Setup ADCP
 #surf= 2m from the surface
 #col1=50bins of 2m.    Water is around 95.6m deep (100+1.5-95.6)/2= 2.95 ->delete upper three bins.
 ##Range away from ADCP = (1.5,3.5,5.5,7.5, etc...)
 #col2=40bins of 0.5m, with 50% overlap. So 40*0.5*0.50%= 10m. +1.5m start away from ADCP = 11.5m RANGE.
 ##Range away from ADCP = (1.5,1.75,2.00,2.25,2.50,2.75, etc...)
 
-#2.1 Derive depth of all bins from depth ADCP
+#Derive depth of all bins from depth ADCP
 Binscol1=np.arange(Blankingdistance+len(Backscatcol1)*Binsize,Blankingdistance,Binsize*-1)         #depth of bins
 Depthbincol1=np.zeros((len(Binscol1),len(Time)),dtype='float')
 
@@ -136,73 +136,15 @@ for i in range(len(Time)):
     Depthbincol1[:,i]=np.arange((Depth[i]-Blankingdistance),(Depth[i]-len(Binscol1)*Binsize-Blankingdistance),Binsize*-1)
     
     i=i+1
-    
-#Make density
-MDens=np.zeros((len(MDepth),len(MTime)),dtype='float')
-
-for i in range(len(MDepth)):
-    
-    for j in range(len(MTime)):
-        
-        e=gsw.density.rho_t_exact(MSal[i,j],MTemp[i,j],MDepth[i])
-
-        MDens[i,j]=e
-        
-        j=j+1
-        
-    i=i+1
-            
-#2.2 Interpolate Sal and Time from day/isopycnals to 30min/m.
-MTime_1=np.arange(0,(len(MTime)-1)*48+1,1, dtype='datetime64[h]')
-Mtime_2=(pd.Series(MSal[1,:],index=MTime).resample('30min').mean()).index
-MSal_1=np.zeros((int(np.max(Depth))+1,len(MTime)),dtype='float')
-MSal_2=np.zeros((int(np.max(Depth))+1,len(MTime_1)),dtype='float')
-MTemp_1=np.zeros((int(np.max(Depth))+1,len(MTime)),dtype='float')
-MTemp_2=np.zeros((int(np.max(Depth))+1,len(MTime_1)),dtype='float')
-MDens_1=np.zeros((int(np.max(Depth))+1,len(MTime)),dtype='float')
-MDens_2=np.zeros((int(np.max(Depth))+1,len(MTime_1)),dtype='float')
-
-#first for each depth
-for i in range(len(MTime)):
-    
-    a=scipy.interpolate.interp1d(MDepth,MSal[:,i],fill_value='extrapolate')      #interpolate measurments from bins to entire depth ADCP.
-
-    MSal_1[:,i]=a(Watercolumn)
-    
-    b=scipy.interpolate.interp1d(MDepth,MTemp[:,i],fill_value='extrapolate')      #interpolate measurments from bins to entire depth ADCP.
-
-    MTemp_1[:,i]=b(Watercolumn)
-    
-    c=scipy.interpolate.interp1d(MDepth,MDens[:,i],fill_value='extrapolate')      #interpolate measurments from bins to entire depth ADCP.
-
-    MDens_1[:,i]=c(Watercolumn)
-
-    i=i+1
-
-for i in range(len(Watercolumn)):
-    
-    a=pd.Series(MSal_1[i,:],index=MTime).resample('30min').mean()
-
-    MSal_2[i,:]=a.interpolate(method='time')
-
-    b=pd.Series(MTemp_1[i,:],index=MTime).resample('30min').mean()
-
-    MTemp_2[i,:]=b.interpolate(method='time')
-
-    c=pd.Series(MDens_1[i,:],index=MTime).resample('30min').mean()
-
-    MDens_2[i,:]=c.interpolate(method='time')
-
-    i=i+1 
-
-#2.3 Correlation
+               
+#Section 3.2.1 in the thesis - Quality control ADCP  - Check for low correlation 
 ##Col1
 for i in range(len(Time)):          #per unit of time
     
     for j in range(len(Binscol1)):                #each bin depth
         
     ##CORRELATION        
-        if Correlationbeam1col1[j,i] <=0.20:            #If correlation is lower than 50 -> np.NaN
+        if Correlationbeam1col1[j,i] <=0.20:            #If correlation is lower than 20 -> np.NaN
             Backscatcol1[j,i]=np.nan
             VertvelABcol1[j,i]=np.nan
             Vertvelcol1[j,i]=np.nan
@@ -236,7 +178,7 @@ for i in range(len(Time)):          #per unit of time
         
     i=i+1
     
-#2.4 Taking movement out of the ADCP THIS WORKS
+#Section 3.2.1 in the thesis -Quality control ADCP - Taking movement out of the ADCP
 
 Backscatcol1_1=np.zeros((len(Time),int(np.max(Depth))+1),dtype='float')
 VertvelABcol1_1=np.zeros((len(Time),int(np.max(Depth))+1),dtype='float')
@@ -244,6 +186,7 @@ Vertvelcol1_1=np.zeros((len(Time),int(np.max(Depth))+1),dtype='float')
 SpeedEWcol1_1=np.zeros((len(Time),int(np.max(Depth))+1),dtype='float')
 SpeedNScol1_1=np.zeros((len(Time),int(np.max(Depth))+1),dtype='float')
 
+#Interpolate from depths that were registered during deployment (and therefore included tides) to m- water depth. -> filters out tides.
 for i in range(len(Time)):  #for each measurement
     
     a=scipy.interpolate.interp1d(Depthbincol1[:,i],Backscatcol1[:,i],'linear',fill_value='extrapolate') #interpolate between depth and backscatter/ vertical velocity -> assign to new depth.
@@ -263,8 +206,7 @@ for i in range(len(Time)):  #for each measurement
 
     i=i+1
 
-#2.5 DETERMINING DEGREDATION OF SIGNAL OVER DISTANCE FROM AND TOWARDS ADCPs (TIME VARIED GAIN)______________________________________
-
+#Section 3.2.1 in the thesis - Accounting for loss and movement - Time varied gainDETERMINING DEGREDATION OF SIGNAL OVER DISTANCE FROM AND TOWARDS ADCPs_____________________________
 #f(ADCP)= 250Hz...The Francois & Garrison, 1982 formula is used because it is suitable for a sound frequency 
 #range of 200 Hz to 1MH. In seawater sound is absorbed by 3 parts, together forming the total sound absorption
 #Part I (boric acid), part II (MgSO4), part III (Pure water)
@@ -354,7 +296,70 @@ for i in range(len(Time)):  #Within that loop do for each week
 # plt.legend()
 # =============================================================================
 
-#2.6 interpolate all the datasets that are being lowpassed
+#Section 3.2.2 in thesis - CTD data processing______________________________________________________________________________________________________________________
+#2.2 Aligning CTD data to fit ADCP data - Interpolate Sal, Timp and Dens from day/isopycnals to 30min/m.
+
+#First I have to compute density on basis of the Sal, and Temp from the NORFJORD model
+MDens=np.zeros((len(MDepth),len(MTime)),dtype='float')
+
+for i in range(len(MDepth)):
+    
+    for j in range(len(MTime)):
+        
+        e=gsw.density.rho_t_exact(MSal[i,j],MTemp[i,j],MDepth[i])
+
+        MDens[i,j]=e
+        
+        j=j+1
+        
+    i=i+1
+
+MTime_1=np.arange(0,(len(MTime)-1)*48+1,1, dtype='datetime64[h]')
+Mtime_2=(pd.Series(MSal[1,:],index=MTime).resample('30min').mean()).index
+MSal_1=np.zeros((int(np.max(Depth))+1,len(MTime)),dtype='float')
+MSal_2=np.zeros((int(np.max(Depth))+1,len(MTime_1)),dtype='float')
+MTemp_1=np.zeros((int(np.max(Depth))+1,len(MTime)),dtype='float')
+MTemp_2=np.zeros((int(np.max(Depth))+1,len(MTime_1)),dtype='float')
+MDens_1=np.zeros((int(np.max(Depth))+1,len(MTime)),dtype='float')
+MDens_2=np.zeros((int(np.max(Depth))+1,len(MTime_1)),dtype='float')
+
+#First I am interpolating from depth in bins, to depth in meters depth
+for i in range(len(MTime)):
+    
+    a=scipy.interpolate.interp1d(MDepth,MSal[:,i],fill_value='extrapolate')      #interpolate measurments from bins to entire depth ADCP.
+
+    MSal_1[:,i]=a(Watercolumn)
+    
+    b=scipy.interpolate.interp1d(MDepth,MTemp[:,i],fill_value='extrapolate')      #interpolate measurments from bins to entire depth ADCP.
+
+    MTemp_1[:,i]=b(Watercolumn)
+    
+    c=scipy.interpolate.interp1d(MDepth,MDens[:,i],fill_value='extrapolate')      #interpolate measurments from bins to entire depth ADCP.
+
+    MDens_1[:,i]=c(Watercolumn)
+
+    i=i+1
+
+#Then I interpolate from the current timedelta to the preffered time delta (30 min)
+for i in range(len(Watercolumn)):
+    
+    a=pd.Series(MSal_1[i,:],index=MTime).resample('30min').mean()
+
+    MSal_2[i,:]=a.interpolate(method='time')
+
+    b=pd.Series(MTemp_1[i,:],index=MTime).resample('30min').mean()
+
+    MTemp_2[i,:]=b.interpolate(method='time')
+
+    c=pd.Series(MDens_1[i,:],index=MTime).resample('30min').mean()
+
+    MDens_2[i,:]=c.interpolate(method='time')
+
+    i=i+1 
+ 
+#Section 3.2.3 in thesis: Time series analysis__________________________________________________________________________________________________________________________
+
+#Time series analysis - 1. interpolate all the datasets that are being analysied
 a=pd.DataFrame(Backscatcol1_2)
 Backscatcol1_3=a.interpolate(method='linear', axis='columns',limit_direction='both')
 #plt.plot(Watercolumn,a.iloc[4000,:],'bo', Watercolumn, Backscatcol1_3.iloc[4000,:],'r')    
@@ -367,7 +372,7 @@ a=pd.DataFrame(Vertvelcol1_1)
 Vertvelcol1_2=a.interpolate(method='linear', axis='columns',limit_direction='both')
 #plt.plot(Watercolumn,a.iloc[4000,:],'bo', Watercolumn, Vertvelcol1_2.iloc[4000,:],'r')    
 
-#2.FFT What patterns are visible in the data
+#Section 3.2.3 in thesis: Time series analysis - 2. FFT What patterns are visible in the data
 #Mooring1 - backscat
 numbersig=10
 
@@ -440,13 +445,9 @@ for i in range(len(Backscatcol1_3.iloc[1,:])-1):
     vvelffilt[:,i]=np.fft.ifft(fhat)
 
     i=i+1
-    
-#CHAPTER 3: MAKING THE DATA PRESENTABLE_______________________________________________________________    
 
-#3.1 FILTERS
-
-#Make new datasets for lowpassed data    
-
+#Section 3.2.3 in thesis: Time series analysis - 3. low-pass filters
+ 
 #12h
 dt=1                            #Sampling interval of timeseries (halfhours)
 cutoff=24                       #Cut off period (halfhours) (low-pass (lp) > 24-36h removes tides + inertial oscillations)
@@ -468,7 +469,7 @@ for i in range(len(Backscatcol1_2[:,1])):
 
     i=i+1
 
-#Bandpass filter
+#Section 3.2.3 in thesis: Time series analysis - 4. Band-pass filters
 
 dt=1            
 nyq=1/2/dt
@@ -586,21 +587,8 @@ for i in range(len(Backscatcol1_3.iloc[1,:])):
 
     i=i+1
 
-#3.2 Vertical velocity anomaly    
-# =============================================================================
-# #The Doppler vertical velocity data showed a bias
-# towards downward movement when values were averaged
-# over all depths. This bias was deducted from the
-# data to give the ‘Doppler vertical velocity anomaly’,
-# which is a better representation of the
-# actual upward and downward migrations
-# of the scatterers.
-# =============================================================================
-#Look at this with the Plueddemann and Pinkel 1989 paper.
-Vertvelcol1_lp12h_ano=VertvelABcol1_lp12h-np.nanmean(VertvelABcol1_lp12h)
-VertvelABcol1_lp12h_ano=Vertvelcol1_lp12h-np.nanmean(Vertvelcol1_lp12h)
 
-#3.3 ADCP backscatter & vertical velocity model day of each week + vertical velocity anomaly
+#Section 3.2.3 in thesis: Time series analysis - 5. Model days
 
 #Mooring 1
 
@@ -773,7 +761,8 @@ for i in range(len(Backscatcol1_3.iloc[1,:])-1):
 
     i=i+1
 
-#OUTPUT
+
+#OUTPUT Data for plotting in 'Bergsfjorden ...'
 Bergsfjorden={      
                     'Backscatcol1':Backscatcol1_3,
                     'Backscatcol1_6dav':Backscatcol1_6dav,
