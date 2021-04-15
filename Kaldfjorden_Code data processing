@@ -1070,6 +1070,14 @@ WWinddirLangnes=Wind.iloc[9684:17156,4]
 WPrecipitation_time=pd.to_datetime(Precipitation.iloc[12:7497,2], format='%d.%m.%Y %H:%M')
 WPrecipitation=Precipitation.iloc[12:7497,3] 
 
+Rad_time=np.zeros((len(Rad_t),1),dtype='datetime64[s]')
+
+for j in range(len(Rad_time)):
+    
+    Rad_time[j]=datetime.datetime.strptime(str(Rad_t[j]),'%Y-%m-%dT%H:%M:%S')
+      
+    j=j+1
+
 #Section 3.2.2 in the thesis - Aquaculture data processing______________________________________________________________
 
 #Import
