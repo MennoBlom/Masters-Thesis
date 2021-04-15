@@ -1,20 +1,27 @@
-# 1. Data import (Beginning and end of measurement, surface) 
-#       ADCP
-#       CTD
-#       Sedimenttrap
-# 2. Data cleaning
-#   2.1 Devrive depth of all bins from depth ADCP
-#   2.2 Correlation
-#   2.3 All data on same time period
-#   2.4 Vertical movement filter ADCP
-#   2.5 Determination TVG
-#   2.6 interpolation
-#   2.7 Fast Forier Transformation -> what patterns are visible?
-# 3. Making data presentable
-#   3.1 Filters, lowpassed, bandpass filter.
-#   3.2 Vertical velocity anomaly
-#   3.3 Model days of ADCP backscatter & vertical velocity
-# Export cleaned data as 'ADCP data Kaldfjorden clean'
+#3.2.1 ADCP data processing
+## Quality control (Correlation, cross difference)
+## Accounting for loss and movement (Removing vertical movement, time varied gain)
+
+#3.2.2 CTD data processing
+##Computation density
+##Data alignment
+#3.2.2 Sediment trap data processing 
+#3.2.2 Meteorological data processing
+##Data alignment
+##Computation solar irradiance
+#3.2.2 Aquaculture data processing
+##Data alignment
+##Combining net cages
+
+#3.2.3 Time series analysis
+##Interpolation
+##FFT
+##Low-pass filters
+##Band-pass filters
+##Model days
+
+#EXPORT
+
 
 #import packages
 import scipy.io
@@ -39,6 +46,9 @@ from netCDF4 import num2date, date2num
 from scipy.signal import welch, hanning
 import seaborn
 import mat73
+
+
+#Section 3.2.1 in the thesis - ADCP data processing - _________________________________________________________________________________________________________________________
 
 #Import ADCP data Bergsfjorden_MATLAB dataset as dictionary
 mat= scipy.io.loadmat('Bergsfjorden_data_from Excel.mat', squeeze_me=True,struct_as_record=False)
@@ -99,12 +109,6 @@ Speedeast=mat['data'].EastSpeed[1:45,3:7960]
 Speednorth=mat['data'].NorthSpeed[1:45,3:7960]
 Salinity=mat['data'].Salinity[3:7960]
 
-#Model Temp + Sal data
-MTemp=matCTD['T'][5,:,:]        #Potential temperature (degrees Celsius)
-MSal=matCTD['S'][5,:,:]         #Practical salinity
-MDepth=matCTD['Z'][5,:]         #Depth
-MTime=pd.to_datetime((matCTD['TIME'][:])-719529, unit='D').round('s')
-
 #Other sensors
 Tur=mat['data'].Turbidity14570[3:7960]
 Chl=mat['data'].Chlorophyll2103754[3:7960]
@@ -119,7 +123,6 @@ Tidepres=mat['data'].TidePressure[3:7960]
 Airsaturation=mat['data'].AirSaturation[3:7960]
 Conductivity=mat['data'].Conductivity[3:7960]
 
-#Section 3.2.1 in the thesis - ADCP data processing_________________________________________________________________________________________________________________________
 #Setup ADCP
 #surf= 2m from the surface
 #col1=50bins of 2m.    Water is around 95.6m deep (100+1.5-95.6)/2= 2.95 ->delete upper three bins.
@@ -137,7 +140,7 @@ for i in range(len(Time)):
     
     i=i+1
                
-#Section 3.2.1 in the thesis - Quality control ADCP  - Check for low correlation 
+#Section 3.2.1 in the thesis - Data processing ADCP - Quality control - Correlation and cross difference__________________________________________________________________________ 
 ##Col1
 for i in range(len(Time)):          #per unit of time
     
@@ -178,8 +181,9 @@ for i in range(len(Time)):          #per unit of time
         
     i=i+1
     
-#Section 3.2.1 in the thesis -Quality control ADCP - Taking movement out of the ADCP
 
+
+#Section 3.2.1 in the thesis - Data processing ADCP - Accounting for loss and movement - Taking movement out of the ADCP____________________________________
 Backscatcol1_1=np.zeros((len(Time),int(np.max(Depth))+1),dtype='float')
 VertvelABcol1_1=np.zeros((len(Time),int(np.max(Depth))+1),dtype='float')
 Vertvelcol1_1=np.zeros((len(Time),int(np.max(Depth))+1),dtype='float')
@@ -205,8 +209,8 @@ for i in range(len(Time)):  #for each measurement
     SpeedNScol1_1[i,:]=a(Watercolumn)
 
     i=i+1
-
-#Section 3.2.1 in the thesis - Accounting for loss and movement - Time varied gainDETERMINING DEGREDATION OF SIGNAL OVER DISTANCE FROM AND TOWARDS ADCPs_____________________________
+    
+#Section 3.2.1 in the thesis - Data processing ADCP - Accounting for loss and movement - Time varied gain DETERMINING DEGREDATION OF SIGNAL OVER DISTANCE FROM AND TOWARDS ADCPs_____________________________    
 #f(ADCP)= 250Hz...The Francois & Garrison, 1982 formula is used because it is suitable for a sound frequency 
 #range of 200 Hz to 1MH. In seawater sound is absorbed by 3 parts, together forming the total sound absorption
 #Part I (boric acid), part II (MgSO4), part III (Pure water)
@@ -296,10 +300,24 @@ for i in range(len(Time)):  #Within that loop do for each week
 # plt.legend()
 # =============================================================================
 
-#Section 3.2.2 in thesis - CTD data processing______________________________________________________________________________________________________________________
-#2.2 Aligning CTD data to fit ADCP data - Interpolate Sal, Timp and Dens from day/isopycnals to 30min/m.
 
-#First I have to compute density on basis of the Sal, and Temp from the NORFJORD model
+
+
+
+
+
+
+
+#Section 3.2.2 in thesis - CTD data processing______________________________________________________________________________________________________________________
+
+#IMPORT Model Temp + Sal data
+MTemp=matCTD['T'][5,:,:]        #Potential temperature (degrees Celsius)
+MSal=matCTD['S'][5,:,:]         #Practical salinity
+MDepth=matCTD['Z'][5,:]         #Depth
+MTime=pd.to_datetime((matCTD['TIME'][:])-719529, unit='D').round('s')
+
+
+#Section 3.2.2 in thesis - CTD data processing - Computation densitity on basis of the Sal, and Temp from the NORFJORD model
 MDens=np.zeros((len(MDepth),len(MTime)),dtype='float')
 
 for i in range(len(MDepth)):
@@ -314,6 +332,7 @@ for i in range(len(MDepth)):
         
     i=i+1
 
+#Section 3.2.2 in thesis - CTD data processing - Data alignment
 MTime_1=np.arange(0,(len(MTime)-1)*48+1,1, dtype='datetime64[h]')
 Mtime_2=(pd.Series(MSal[1,:],index=MTime).resample('30min').mean()).index
 MSal_1=np.zeros((int(np.max(Depth))+1,len(MTime)),dtype='float')
@@ -356,10 +375,225 @@ for i in range(len(Watercolumn)):
     MDens_2[i,:]=c.interpolate(method='time')
 
     i=i+1 
- 
+    
+    
+    
+    
+    
+#Section 3.2.2 in thesis - Sediment trap data processing______________________________________________________________________________________________________________________        
+
+#Import sediment trap data
+Sedimenttrap=pd.read_csv('Bergsfjorden_Sedimenttrap.csv',sep=';')
+Distancefromfarm=[-10,10,100,200,400,700,1500]
+      
+      
+      
+      
+      
+      
+#Section 3.2.2 in thesis - Meteorological data processing______________________________________________________________________________________________________________________    
+    
+#Import csv
+Temperature=pd.read_csv('Bergsfjorden weather_temp.csv', sep=';',error_bad_lines=False)
+Wind=pd.read_csv('Bergsfjorden weather_wind (direc).csv', sep=';',error_bad_lines=False)
+
+#Section 3.2.2 in thesis - Meteorological data processing - Data alignment -> Frouin
+#Temperature
+WTemptime=pd.to_datetime(Temperature.iloc[0:5111,2], format='%d.%m.%Y %H:%M')
+WTempTorsvag=Temperature.iloc[0:5111,3]
+WTempLangfjord=Temperature.iloc[5111:10209,3]
+WTempHasvik=Temperature.iloc[10209:15320,3]
+#Wind
+Wwind_time=pd.to_datetime(Temperature.iloc[0:5111,2], format='%d.%m.%Y %H:%M')
+WindHasvik=Wind.iloc[0:5111,4]
+WinddirHasvik=Wind.iloc[0:5111,3]
+
+#Section 3.2.2 in thesis - Meteorological data processing - Computation of solar irradiance -> Frouin
+
+#Make datafiles
+days=np.arange(1,366,1/24)                            #day number of the year
+months=np.arange(1,366,31)
+angle=np.zeros((2,len(days)), dtype='float')       #Angle of the sun at each day. p.11 Iqbal 1.2.2
+hourangle=np.arange(180,-180,-15)                      #Angle of the sun as opposed to the 
+#hourangle=np.arange(15,375,15)                      #Angle of the sun as opposed to the 
+for i in range(int(len(days)/24)):
+    
+    angle[1,24*i:24*i+24]=hourangle# / (180/np.pi) for radians
+    i=i+1
+
+ddo=np.zeros((1,len(days)), dtype='float')            #Ratio between distance of the sun and mean of distance between sun and earth
+declination= np.zeros((1,len(days)), dtype='float')   #Declination of the sun at each day. p.15 Iqbal 1.3.1
+zen=np.zeros((1,len(days)), dtype='float')            #Senith angle hourly
+Uv=np.zeros((1,len(days)), dtype='float')             #amount of precipitable water in the atmosphere (cm) 
+I=np.zeros((1,len(days)), dtype='float')              #Solar irradiance
+
+#Site specific parameters
+latitude = 70.24# / (180/np.pi) for radians #latitude Bergsfjorden
+#latitude = 40.78330492607448 / (180/np.pi) # latitude New York in radians
+#declination = -8.66749475066716 / (180/np.pi)
+#hourangle = 15 /  (180/np.pi)
+Uo_monthly = [0.34, 0.40, 0.46, 0.42, 0.40, 0.36, 0.34, 0.31, 0.29, 0.28, 0.29, 0.31] #Iqbal p.89 Table 5.3.2 70N. Montly ozone concentration in the air
+Uo_hourly = np.interp(days,months,Uo_monthly)
+
+humidity_monthly = [0.68,0.70,0.70,0.67,0.65,0.69,0.73,0.83,0.80,0.79,0.70,0.71]# seklima.met.no Nuvsvåg weather station monthly humidity
+humidity_hourly = np.interp(days,months,humidity_monthly)
+
+Temp_monthly = [-1.3+273.15, -1.5+273.15, -1.7+273.15, 0.2+273.15, 4+273.15, 8.9+273.15, 13.1+273.15, 11.2+273.15, 8.6+273.15, 4.5+273.15, 3.2+273.15, -0.4+273.15]# seklima.met.no Nuvsvåg weather station monthly temp in Kelvin
+Temp_hourly = np.interp(days,months,Temp_monthly)
+
+#Standardized parameters
+I0=  1355.49 #Iqbal p.47 (SUM I0 - lambda 4000) Monochromatic extraterrestrial irradiance between wavelength lambda1 and lambda2
+a  = 0.066 #regression coefficient depends on type of arisol and spectral range, try 100% lambda 250 - 4000 + continental arosol
+ai = 0.088 #regression coefficient depends on type of arisol and spectral range, try 100% lambda 250 - 4000 + continental arosol
+av = 0.102 #regression coefficient depends on type of arisol and spectral range, try 100% lambda 250 - 4000 + continental arosol
+ao = 0.041 #regression coefficient depends on type of arisol and spectral range, try 100% lambda 250 - 4000 + continental arosol
+b  = 0.704 #regression coefficient depends on type of arisol and spectral range, try 100% lambda 250 - 4000 + continental arosol
+bi = 0.456 #regression coefficient depends on type of arisol and spectral range, try 100% lambda 250 - 4000 + continental arosol
+bv = 0.29  #regression coefficient depends on type of arisol and spectral range, try 100% lambda 250 - 4000 + continental arosol
+bo = 0.57  #regression coefficient depends on type of arisol and spectral range, try 100% lambda 250 - 4000 + continental arosol
+r= 0.4 #Iqbal p.286. Figure 9.3.2. Smooth SEA surface reflectance
+V= 23 #surface visibility (km) ASSUMPTION
+
+
+for i in range(len(days)):
+    
+    #CORRECT
+    c=(2*np.pi*(days[i]-1))/365 #Iqbal p.3 formula 1.2.2
+    angle[0,i]=c
+    
+    #CORRECT
+    ddo[0,i]= 1.000110 + (0.034221*np.cos(c)) + (0.001280*np.sin(c)) + (0.000719*np.cos(2*c)) + (0.000077*np.sin(c)) #Iqbal p.3 formule 1.2.1 Ratio of actual to mean Earth- Sun separation
+    
+    #CORRECT
+    declination[0,i] = (0.006918 - 0.399912 * np.cos(c) + 0.070257 *np.sin(c) 
+                        - 0.006758* np.cos(2*c) + 0.000907 *np.sin(2*c)
+                        - 0.002697 *np.cos(3*c) + 0.00148 *np.sin(3*c))* (180/np.pi) #Iqbal  p.7 formula 1.3.1 in radians ( * 180/np.pi) to convert to degrees
+    
+    #CORRECT
+    zen[0,i] = math.acos((np.sin(np.deg2rad(declination[0,i]))*np.sin(np.deg2rad(latitude)))+(np.cos(np.deg2rad(declination[0,i]))*np.cos(np.deg2rad(latitude))*np.cos(np.deg2rad(angle[1,i]))))*(180/np.pi) #Iqbal p.15-17 formula 1.5.1 zenith angle of the sun in degrees
+
+    #CORRECT
+    Uv[0,i] = (0.493*humidity_hourly[i]*(np.exp(26.23 - 5416/Temp_hourly[i])))/Temp_hourly[i] #Iqbal p.94 formula 5.4.6 and 5.4.7. amount of precipitable water in the atmosphere (cm) 
+
+    #CHECK THIS
+    I[0,i] = ((I0 * ((ddo[0,i])**2))\
+            *(np.cos(np.deg2rad(zen[0,i]))*((np.exp((-1*((a+b)/V))/np.cos(np.deg2rad(zen[0,i]))))/(1-r*((ai + bi)/V))))\
+            *(np.exp(-1*av *(Uv[0,i]/np.cos(np.deg2rad(zen[0,i])))**(bv)))\
+            *((np.exp(-1*ao *(Uo_hourly[i]/np.cos(np.deg2rad(zen[0,i])))**(bo)))))#Irradiance between wavelength lambda1 and lambda2.
+        
+    i=i+1
+
+I[np.isnan(I)] = 0
+
+#Section 3.2.2 in thesis - Aquaculture data processing - ______________________________________________________________________________________________________________________
+
+#Section 3.2.2 in thesis - Aquaculture data processing - Data alignment
+Aquaculture=pd.read_csv('Bergsfjorden_aquaculture.csv',sep=',')
+AC_Tim=pd.to_datetime(np.unique(Aquaculture.iloc[1:,5]), format='%d.%m.%Y')
+AC_Time=np.zeros((1,len(AC_Tim)),dtype='datetime64[h]')
+AC_Time[0,:]=AC_Tim
+AC_Time=np.sort(AC_Time)
+
+a=np.where(Aquaculture.iloc[:,4]=='1')
+Aquacultureunit1=Aquaculture.iloc[a]
+
+a=np.where(Aquaculture.iloc[:,4]=='2')
+Aquacultureunit2=Aquaculture.iloc[a]
+
+a=np.where(Aquaculture.iloc[:,4]=='3')
+Aquacultureunit3=Aquaculture.iloc[a]
+
+a=np.where(Aquaculture.iloc[:,4]=='4')
+Aquacultureunit4=Aquaculture.iloc[a]
+
+a=np.where(Aquaculture.iloc[:,4]=='5')
+Aquacultureunit5=Aquaculture.iloc[a]
+
+a=np.where(Aquaculture.iloc[:,4]=='6')
+Aquacultureunit6=Aquaculture.iloc[a]
+
+a=np.where(Aquaculture.iloc[:,4]=='7')
+Aquacultureunit7=Aquaculture.iloc[a]
+
+a=np.where(Aquaculture.iloc[:,4]=='8')
+Aquacultureunit8=Aquaculture.iloc[a]
+
+
+
+#Section 3.2.2 in thesis - Aquaculture data processing - Combining net cages
+Feeding=np.zeros((1,len(AC_Time[0,:])),dtype='float')
+
+i=584
+for i in range(len(AC_Time[0,:])):
+    
+    a=AC_Time[0,i]
+    a1=np.where(np.abs(AC_Time[0,i] == pd.to_datetime(Aquacultureunit1.iloc[:,5],format='%d.%m.%Y')))
+    a2=np.where(np.abs(AC_Time[0,i] == pd.to_datetime(Aquacultureunit2.iloc[:,5],format='%d.%m.%Y')))
+    a3=np.where(np.abs(AC_Time[0,i] == pd.to_datetime(Aquacultureunit3.iloc[:,5],format='%d.%m.%Y')))
+    a4=np.where(np.abs(AC_Time[0,i] == pd.to_datetime(Aquacultureunit4.iloc[:,5],format='%d.%m.%Y')))
+    a5=np.where(np.abs(AC_Time[0,i] == pd.to_datetime(Aquacultureunit5.iloc[:,5],format='%d.%m.%Y')))
+
+    if not all(a1) is True : b1=0
+    else: b1=float(Aquacultureunit1.iloc[int(a1[0]),7])
+
+    if not all(a2) is True : b2=0
+    else: b2=float(Aquacultureunit2.iloc[int(a2[0]),7])
+
+    if not all(a3) is True : b3=0
+    else: b3=float(Aquacultureunit3.iloc[int(a3[0]),7])
+
+    if not all(a4) is True : b4=0
+    else: b4=float(Aquacultureunit4.iloc[int(a4[0]),7])
+
+    if not all(a5) is True : b5=0
+    else: b5=float(Aquacultureunit5.iloc[int(a5[0]),7])
+
+    Feeding[0,i]=b1+b2+b3+b4+b5
+
+    i=i+1
+
+plt.plot(Feeding[0,:])
+
+Biomass=np.zeros((1,len(AC_Time[0,:])),dtype='float')
+
+i=584
+for i in range(len(AC_Time[0,:])):
+    
+    a=AC_Time[0,i]
+    a1=np.where(np.abs(AC_Time[0,i] == pd.to_datetime(Aquacultureunit1.iloc[:,5],format='%d.%m.%Y')))
+    a2=np.where(np.abs(AC_Time[0,i] == pd.to_datetime(Aquacultureunit2.iloc[:,5],format='%d.%m.%Y')))
+    a3=np.where(np.abs(AC_Time[0,i] == pd.to_datetime(Aquacultureunit3.iloc[:,5],format='%d.%m.%Y')))
+    a4=np.where(np.abs(AC_Time[0,i] == pd.to_datetime(Aquacultureunit4.iloc[:,5],format='%d.%m.%Y')))
+    a5=np.where(np.abs(AC_Time[0,i] == pd.to_datetime(Aquacultureunit5.iloc[:,5],format='%d.%m.%Y')))
+
+    if not all(a1) is True : b1=0
+    else: b1=float(Aquacultureunit1.iloc[int(a1[0]),10])
+
+    if not all(a2) is True : b2=0
+    else: b2=float(Aquacultureunit2.iloc[int(a2[0]),10])
+
+    if not all(a3) is True : b3=0
+    else: b3=float(Aquacultureunit3.iloc[int(a3[0]),10])
+
+    if not all(a4) is True : b4=0
+    else: b4=float(Aquacultureunit4.iloc[int(a4[0]),10])
+
+    if not all(a5) is True : b5=0
+    else: b5=float(Aquacultureunit5.iloc[int(a5[0]),10])
+
+    Biomass[0,i]=b1+b2+b3+b4+b5
+
+    i=i+1
+
+
+
+
+
+
+
 #Section 3.2.3 in thesis: Time series analysis__________________________________________________________________________________________________________________________
 
-#Time series analysis - 1. interpolate all the datasets that are being analysied
+#Time series analysis - 1. interpolate all the datasets that are being analysed
 a=pd.DataFrame(Backscatcol1_2)
 Backscatcol1_3=a.interpolate(method='linear', axis='columns',limit_direction='both')
 #plt.plot(Watercolumn,a.iloc[4000,:],'bo', Watercolumn, Backscatcol1_3.iloc[4000,:],'r')    
@@ -371,6 +605,9 @@ VertvelABcol1_2=a.interpolate(method='linear', axis='columns',limit_direction='b
 a=pd.DataFrame(Vertvelcol1_1)
 Vertvelcol1_2=a.interpolate(method='linear', axis='columns',limit_direction='both')
 #plt.plot(Watercolumn,a.iloc[4000,:],'bo', Watercolumn, Vertvelcol1_2.iloc[4000,:],'r')    
+
+
+
 
 #Section 3.2.3 in thesis: Time series analysis - 2. FFT What patterns are visible in the data
 #Mooring1 - backscat
