@@ -1,6 +1,4 @@
-#DATA ANALYSIS THESIS MENNO BLOM
-
-#Structure KALDFJORDEN
+#Structure
 #3.2.1 ADCP data processing
 ## Quality control (Correlation, cross difference)
 ## Accounting for loss and movement (Removing vertical movement, time varied gain)
