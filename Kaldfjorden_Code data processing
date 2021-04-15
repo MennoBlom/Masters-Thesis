@@ -1,15 +1,15 @@
 #Structure
 #3.2.1 ADCP data processing
-## Quality control (Correlation, cross difference)
-## Accounting for loss and movement (Removing vertical movement, time varied gain)
+## Quality control (Correlation, error)
+## Accounting for loss and movement (Removing vertical movement, time varied gain, combining beams)
 
 #3.2.2 CTD data processing
 ##Computation density
 ##Data alignment
 #3.2.2 Sediment trap data processing 
+##Data alignment
 #3.2.2 Meteorological data processing
 ##Data alignment
-##Computation solar irradiance
 #3.2.2 Aquaculture data processing
 ##Data alignment
 ##Combining net cages
