@@ -1,6 +1,29 @@
 #DATA ANALYSIS THESIS MENNO BLOM
 
 #Structure KALDFJORDEN
+#3.2.1 ADCP data processing
+## Quality control (Correlation, cross difference)
+## Accounting for loss and movement (Removing vertical movement, time varied gain)
+
+#3.2.2 CTD data processing
+##Computation density
+##Data alignment
+#3.2.2 Sediment trap data processing 
+#3.2.2 Meteorological data processing
+##Data alignment
+##Computation solar irradiance
+#3.2.2 Aquaculture data processing
+##Data alignment
+##Combining net cages
+
+#3.2.3 Time series analysis
+##Interpolation
+##FFT
+##Low-pass filters
+##Band-pass filters
+##Model days
+
+
 # 1. Data import (Beginning and end of measurement, surface)
 #       ADCP
 #       CTD
@@ -46,7 +69,7 @@ from netCDF4 import num2date, date2num
 from scipy.signal import welch, hanning
 import seaborn
 
-#CHAPTER 1 'Data import in Python'_______________________________________________________________________________
+#Section 3.2.1 in the thesis - ADCP data processing _______________________________________________________________________________
 
 #Import ADCP data Kaldfjorden_MATLAB dataset as dictionary
 Mooring1= scipy.io.loadmat('WHALE_ADCP_T1.mat')
@@ -106,74 +129,9 @@ M2binsADCP=np.arange(0,63,1)
 M2rangeADCP=np.arange(0,M2DepthADCP,1)
 M2depth=np.arange(0,int(M2DepthADCP),1)
 
-#Data Kaldfjorden_CTD dataset and extract Salinity, Temperature and Pressure data
-basectd=datetime.datetime(2017,9,7)         #Starttime CTD measurement
+#Convert MATLAB datenum to Python datetime
 
-#CTD_T1 for Mooring 1
-CTD_M1=netCDF4.Dataset(r'WHALE_CTD_transect_T1.nc', variables=['PSAL','POTEMP','PRES','TIME'])
-CTD_M1_Salinity = CTD_M1['PSAL'][:,2,:]             #Extracting Salinity data
-CTD_M1_Temperature = CTD_M1['POTEMP'][:,2,:]        #Extracting Temperature data
-CTD_M1_Pressure= CTD_M1['PRES'][:]                  #Extracting Pressure data
-CTD_M1_Time=netCDF4._netCDF4.num2date(CTD_M1['TIME'][:,2], units=CTD_M1['TIME'].units, calendar='standard',only_use_cftime_datetimes=False,only_use_python_datetimes=True)
-CTD_M1_Time[5]=np.NaN
-CTD_M1_bins=np.arange(0,len(CTD_M1_Pressure)*2*0.9804139432000052,2*0.9804139432000052)
-
-#CTD_T2 for Mooring 2
-CTD_M2=netCDF4.Dataset(r'WHALE_CTD_transect_T2.nc',variables=['PSAL','POTEMP','PRES','TIME'])
-CTD_M2_Salinity = CTD_M2['PSAL'][:,2,:]             #Unit: Psu              Extracting Salinity data
-CTD_M2_Temperature = CTD_M2['POTEMP'][:,2,:]        #Unit: Degrees Celsius  Extracting Temperature data
-CTD_M2_Pressure= CTD_M2['PRES'][:]                  #Unit: decibar.         Extracting Pressure data
-CTD_M2_Time=netCDF4._netCDF4.num2date(CTD_M2['TIME'][:,2], units=CTD_M2['TIME'].units, calendar='standard',only_use_cftime_datetimes=False, only_use_python_datetimes=True)
-CTD_M2_Time[5]=np.NaN
-CTD_M2_bins=np.arange(0,len(CTD_M2_Pressure)*2*0.9804139432000052,2*0.9804139432000052)
-
-#Sediment trap data Kaldfjorden
-#Import Sediment trap data Kaldfjorden
-df=pd.DataFrame(pd.read_csv('Kaldfjorden sediment trap data.csv', sep=';',error_bad_lines=False))
-Timestart=pd.to_datetime(df['start'], format='%d/%m/%Y')# + ' to ' + df['POC (mg C m-2 d-1).1']
-Timeend=pd.to_datetime(df['end'], format='%d/%m/%Y')
-apoc=df['POC (mg C m-2 d-1).1']
-atpm=df['TPM (g m-2 d-1).1']
-achl=df['Chl a (ug m-2 d-1).1']
-aphy=df['Diatoms total (million cells m-2 d-1).1']
-azoo=df['Zooplankton Swimmers.1']
-bpoc=df['POC (mg C m-2 d-1)']
-btpm=df['TPM (g m-2 d-1)']
-bchl=df['Chl a (ug m-2 d-1)']
-bphy=df['Diatoms total (million cells m-2 d-1)']
-bzoo=df['Zooplankton Swimmers']
-
-
-#CHAPTER 2: KALDFJORDEN DATA CLEANING___________________________________________________________________________
-
-#2.1 Take sediment trap out of measurements
-#Take sediment trap out of mooring 1
-M1backscatbeam1_rel1[0:2,21:23]=np.nan
-M1backscatbeam2_rel1[0:2,21:23]=np.nan
-M1backscatbeam3_rel1[0:2,21:23]=np.nan
-M1backscatbeam4_rel1[0:2,21:23]=np.nan
-M1correlationbeam1[0:2,21:23]=np.nan
-M1correlationbeam2[0:2,21:23]=np.nan
-M1correlationbeam3[0:2,21:23]=np.nan
-M1correlationbeam4[0:2,21:23]=np.nan
-M1velocityupZ1[0:2,21:23]=np.nan
-M1velocityupZ2[0:2,21:23]=np.nan
-
-#Take sediment trap out of mooring 2
-M2backscatbeam1_rel1[0:2,24]=np.nan
-M2backscatbeam2_rel1[0:2,24]=np.nan
-M2backscatbeam3_rel1[0:2,24]=np.nan
-M2backscatbeam4_rel1[0:2,24]=np.nan
-M2correlationbeam1[0:2,24]=np.nan
-M2correlationbeam2[0:2,24]=np.nan
-M2correlationbeam3[0:2,24]=np.nan
-M2correlationbeam4[0:2,24]=np.nan
-M2velocityupZ1[0:2,24]=np.nan
-M2velocityupZ2[0:2,24]=np.nan
-
-#2.2 Convert MATLAB datenum to Python datetime____________________________________________________________
-
-#2.2.1 Mooring 1
+#Mooring 1
 
 ##Time each measurement
 M1timeofmeasurementp=np.zeros(((len(M1timeofmeasurement)),1),dtype='datetime64[h]') #Make array with datetime64 type cells, h is unit
@@ -201,7 +159,7 @@ for i in range(320):                                                            
     
     i=i+1
   
-#2.2.2 Mooring 2
+#Mooring 2
 
 ##Time each measurement
 M2timeofmeasurementp=np.zeros(((len(M2timeofmeasurement)),1),dtype='datetime64[h]') 
@@ -227,217 +185,37 @@ for i in range(320):
     M2dayindicationp[i,:]=a
     
     i=i+1
-
-#2.3 ALIGN ALL DATA ON SAME TIME, AND DEPTH INTERVAL__________________________________________________
-
-##Sediment trap measurements monthly to hourly    
-M1timeofmeasurement=pd.to_datetime(M1timeofmeasurementp[:,0],format='%H:%M %d/%m/%Y')
-M2timeofmeasurement=pd.to_datetime(M2timeofmeasurementp[:,0],format='%H:%M %d/%m/%Y')
-           
-M1poc=np.zeros(((len(M1timeofmeasurement),1)),dtype='float')
-M1tpm=np.zeros(((len(M1timeofmeasurement),1)),dtype='float')
-M1chl=np.zeros(((len(M1timeofmeasurement),1)),dtype='float')
-M1phy=np.zeros(((len(M1timeofmeasurement),1)),dtype='float')
-M1zoo=np.zeros(((len(M1timeofmeasurement),1)),dtype='float')
-M2poc=np.zeros(((len(M2timeofmeasurement),1)),dtype='float')
-M2tpm=np.zeros(((len(M2timeofmeasurement),1)),dtype='float')
-M2chl=np.zeros(((len(M2timeofmeasurement),1)),dtype='float')
-M2phy=np.zeros(((len(M2timeofmeasurement),1)),dtype='float')
-M2zoo=np.zeros(((len(M2timeofmeasurement),1)),dtype='float')
-   
-for i in range(len(M1timeofmeasurement)):
     
-    for j in range(len(apoc)):
-        
-        if Timestart[j] <= M1timeofmeasurement[i] <= Timeend[j]:        # if time of measurement is inbetween start and finish of measurement
-            M1poc[i,0]=apoc[j]
-            M1tpm[i,0]=atpm[j]
-            M1chl[i,0]=achl[j]
-            M1phy[i,0]=aphy[j]
-            M1zoo[i,0]=azoo[j]
-        
-            j=j+1
-    i=i+1
-    
-for i in range(len(M2timeofmeasurement)):
-    
-    for j in range(len(bpoc)):
-              
-        if Timestart[j] <= M2timeofmeasurement[i] <= Timeend[j]:        # if time of measurement is inbetween start and finish of measurement
-            M2poc[i,0]=bpoc[j]
-            M2tpm[i,0]=btpm[j]
-            M2chl[i,0]=bchl[j]
-            M2phy[i,0]=bphy[j]
-            M2zoo[i,0]=bzoo[j]
+#Section 3.2.1 in the thesis - ADCP data processing - quality control - take out sediment trap__________________________________________________ 
 
-            j=j+1
-    i=i+1
+#Take sediment trap out of measurements
+#Take sediment trap out of mooring 1
+M1backscatbeam1_rel1[0:2,21:23]=np.nan
+M1backscatbeam2_rel1[0:2,21:23]=np.nan
+M1backscatbeam3_rel1[0:2,21:23]=np.nan
+M1backscatbeam4_rel1[0:2,21:23]=np.nan
+M1correlationbeam1[0:2,21:23]=np.nan
+M1correlationbeam2[0:2,21:23]=np.nan
+M1correlationbeam3[0:2,21:23]=np.nan
+M1correlationbeam4[0:2,21:23]=np.nan
+M1velocityupZ1[0:2,21:23]=np.nan
+M1velocityupZ2[0:2,21:23]=np.nan
 
-#Mooring 1 CTD
-#M1 Temperature for each depth at each time measurement
-CTD_M1_time_month=np.zeros((1,len(CTD_M1_Temperature)),dtype='float')                           
-CTD_M1_time_hours=(pd.Series(CTD_M1_Temperature[:,1],index=CTD_M1_Time).resample('H').mean()).index #resample time from months to hours
+#Take sediment trap out of mooring 2
+M2backscatbeam1_rel1[0:2,24]=np.nan
+M2backscatbeam2_rel1[0:2,24]=np.nan
+M2backscatbeam3_rel1[0:2,24]=np.nan
+M2backscatbeam4_rel1[0:2,24]=np.nan
+M2correlationbeam1[0:2,24]=np.nan
+M2correlationbeam2[0:2,24]=np.nan
+M2correlationbeam3[0:2,24]=np.nan
+M2correlationbeam4[0:2,24]=np.nan
+M2velocityupZ1[0:2,24]=np.nan
+M2velocityupZ2[0:2,24]=np.nan
 
-CTD_M1_Temp_month=np.zeros((len(M1depth),len(CTD_M1_time_month[0,:])),dtype='float')
-CTD_M1_Temp_hours=np.zeros((len(M1depth),len(CTD_M1_time_hours)),dtype='float')
+#Section 3.2.1 in the thesis - ADCP data processing - quality control - Correlation & error__________________________________________________ 
 
-for i in range(len(CTD_M1_Temperature[:,1])):
-    a=scipy.interpolate.interp1d(CTD_M1_bins,CTD_M1_Temperature[i,:],fill_value='extrapolate')      #interpolate measurments from bins to entire depth ADCP.
-
-    CTD_M1_Temp_month[:,i]=a(M1depth)
-    
-    i=i+1
-
-c=CTD_M1_Temp_month[4,3]        #Fill empty cells with nearest value.
-d=CTD_M1_Temp_month[2,7]
-e=CTD_M1_Temp_month[2,8]
-f=CTD_M1_Temp_month[2,11]
-g=CTD_M1_Temp_month[2,17]
-CTD_M1_Temp_month[0,3]=c
-CTD_M1_Temp_month[1,3]=c
-CTD_M1_Temp_month[2,3]=c
-CTD_M1_Temp_month[3,3]=c
-CTD_M1_Temp_month[0,7]=d
-CTD_M1_Temp_month[1,7]=d
-CTD_M1_Temp_month[0,8]=e
-CTD_M1_Temp_month[1,8]=e
-CTD_M1_Temp_month[0,11]=f
-CTD_M1_Temp_month[1,11]=f
-CTD_M1_Temp_month[0,17]=g
-CTD_M1_Temp_month[1,17]=g
-
-for i in range(len(CTD_M1_Temp_hours[:,1])):
-    
-    a=pd.Series(CTD_M1_Temp_month[i,:],index=CTD_M1_Time).resample('H').mean()      # Interpolate from temperature per month to temperature per hour.
-
-    CTD_M1_Temp_hours[i,:]=a.interpolate(method='time')
-
-    i=i+1
-
-
-#M1 Salinity for each depth at each time measurement # Same as for temperature
-CTD_M1_Sal_month=np.zeros((len(M1depth),len(CTD_M1_time_month[0,:])),dtype='float')
-CTD_M1_Sal_hours=np.zeros((len(M1depth),len(CTD_M1_time_hours)),dtype='float')
-
-for i in range(len(CTD_M1_Salinity[:,1])):
-    a=scipy.interpolate.interp1d(CTD_M1_bins,CTD_M1_Salinity[i,:],fill_value='extrapolate')
-
-    CTD_M1_Sal_month[:,i]=a(M1depth)
-    
-    i=i+1
-
-#a=pd.DataFrame(np.where(CTD_M1_Sal_month>40,np.NaN,CTD_M1_Sal_month))
-#b=a.ffill(axis=0)
-#CTD_M1_Sal_month=np.array(b)
-c=CTD_M1_Sal_month[4,3]
-d=CTD_M1_Sal_month[2,7]
-e=CTD_M1_Sal_month[2,8]
-f=CTD_M1_Sal_month[2,11]
-g=CTD_M1_Sal_month[2,17]
-CTD_M1_Sal_month[0,3]=c
-CTD_M1_Sal_month[1,3]=c
-CTD_M1_Sal_month[2,3]=c
-CTD_M1_Sal_month[3,3]=c
-CTD_M1_Sal_month[0,7]=d
-CTD_M1_Sal_month[1,7]=d
-CTD_M1_Sal_month[0,8]=e
-CTD_M1_Sal_month[1,8]=e
-CTD_M1_Sal_month[0,11]=f
-CTD_M1_Sal_month[1,11]=f
-CTD_M1_Sal_month[0,17]=g
-CTD_M1_Sal_month[1,17]=g
-
-
-for i in range(len(CTD_M1_Sal_hours[:,1])):
-    
-    a=pd.Series(CTD_M1_Sal_month[i,:],index=CTD_M1_Time).resample('H').mean()
-
-    CTD_M1_Sal_hours[i,:]=a.interpolate(method='time')
-
-    i=i+1
-
-#Mooring 2 CTD
-##M2 Temperature for each depth and time of measurement
-CTD_M2_time_month=np.zeros((1,len(CTD_M2_Temperature)),dtype='float')
-CTD_M2_time_hours=(pd.Series(CTD_M2_Temperature[:,1],index=CTD_M2_Time).resample('H').mean()).index
-
-CTD_M2_Temp_month=np.zeros((len(M2depth),len(CTD_M2_time_month[0,:])),dtype='float')
-CTD_M2_Temp_hours=np.zeros((len(M2depth),len(CTD_M2_time_hours)),dtype='float')
-
-for i in range(len(CTD_M2_Temperature[:,1])):
-    a=scipy.interpolate.interp1d(CTD_M2_bins,CTD_M2_Temperature[i,:],fill_value='extrapolate')
-
-    CTD_M2_Temp_month[:,i]=a(M2depth)
-    
-    i=i+1
-
-c=CTD_M2_Temp_month[4,3]
-d=CTD_M2_Temp_month[2,7]
-e=CTD_M2_Temp_month[2,8]
-f=CTD_M2_Temp_month[2,10]
-g=CTD_M2_Temp_month[2,16]
-CTD_M2_Temp_month[0,3]=c
-CTD_M2_Temp_month[1,3]=c
-CTD_M2_Temp_month[2,3]=c
-CTD_M2_Temp_month[3,3]=c
-CTD_M2_Temp_month[0,7]=d
-CTD_M2_Temp_month[1,7]=d
-CTD_M2_Temp_month[0,8]=e
-CTD_M2_Temp_month[1,8]=e
-CTD_M2_Temp_month[0,10]=f
-CTD_M2_Temp_month[1,10]=f
-CTD_M2_Temp_month[0,16]=g
-CTD_M2_Temp_month[1,16]=g
-
-for i in range(len(CTD_M2_Temp_hours[:,1])):
-    
-    a=pd.Series(CTD_M2_Temp_month[i,:],index=CTD_M2_Time).resample('H').mean()
-
-    CTD_M2_Temp_hours[i,:]=a.interpolate(method='time')
-
-    i=i+1
-
-##M2 Salinity for each depth at each time measurement
-CTD_M2_Sal_month=np.zeros((len(M2depth),len(CTD_M2_time_month[0,:])),dtype='float')
-CTD_M2_Sal_hours=np.zeros((len(M2depth),len(CTD_M2_time_hours)),dtype='float')
-
-for i in range(len(CTD_M2_Salinity[:,1])):
-    a=scipy.interpolate.interp1d(CTD_M2_bins,CTD_M2_Salinity[i,:],fill_value='extrapolate')
-
-    CTD_M2_Sal_month[:,i]=a(M2depth)
-    
-    i=i+1
-
-c=CTD_M2_Sal_month[4,3]
-d=CTD_M2_Sal_month[2,7]
-e=CTD_M2_Sal_month[2,8]
-f=CTD_M2_Sal_month[2,10]
-g=CTD_M2_Sal_month[2,16]
-CTD_M2_Sal_month[0,3]=c
-CTD_M2_Sal_month[1,3]=c
-CTD_M2_Sal_month[2,3]=c
-CTD_M2_Sal_month[3,3]=c
-CTD_M2_Sal_month[0,7]=d
-CTD_M2_Sal_month[1,7]=d
-CTD_M2_Sal_month[0,8]=e
-CTD_M2_Sal_month[1,8]=e
-CTD_M2_Sal_month[0,10]=f
-CTD_M2_Sal_month[1,10]=f
-CTD_M2_Sal_month[0,16]=g
-CTD_M2_Sal_month[1,16]=g
-
-for i in range(len(CTD_M2_Sal_hours[:,1])):
-    
-    a=pd.Series(CTD_M2_Sal_month[i,:],index=CTD_M2_Time).resample('H').mean()
-
-    CTD_M2_Sal_hours[i,:]=a.interpolate(method='time')
-
-    i=i+1 
-    
-
-#2.4 Correlation & Error______________________________________________________________________________
-
-#2.4.1 Mooring 1
+#Mooring 1
 for i in range(len(M1timeofmeasurementp)):          #per unit of time
     
     for j in range(len(M1binsADCP)):                #each bin depth
@@ -474,7 +252,7 @@ for i in range(len(M1timeofmeasurementp)):          #per unit of time
     
     i=i+1
 
-#2.4.2 Mooring 2
+#Mooring 2
 for i in range(len(M2timeofmeasurementp)):
     
     for j in range(len(M2binsADCP)):
@@ -511,7 +289,7 @@ for i in range(len(M2timeofmeasurementp)):
     
     i=i+1
      
-#2.5 Vertical movement filter ADCP____________________________________________________________________
+#Section 3.2.1 in the thesis - Accounting for loss and movement - removing vertical movement__________________________________________________ 
 
 #Make dataarrays
 M1backscatbeam1_rel2=np.zeros((len(M1timeofmeasurementp),int(M1DepthADCP)),dtype='float')
@@ -634,8 +412,7 @@ for i in range(len(M2timeofmeasurementp)):
 # =============================================================================
 #CHECK plt.plot(M2pressure_array[15,:],M2velocityupZ2[15,:], 'bo', M2depth[1,:], M2vup2[15,:], 'r')
 
-
-#2.6 Determining degradation of signal over distance from and towards ADCP (TIME VARIED GAIN)______________________________________
+#Section 3.2.1 in the thesis - Accounting for loss and movement - Time varied gain Determining degradation of signal over distance from and towards ADCP___________________________________
 
 #f(ADCP)= 250Hz...The Francois & Garrison, 1982 formula is used because it is suitable for a sound frequency 
 #range of 200 Hz to 1MH. In seawater sound is absorbed by 3 parts, together forming the total sound absorption
@@ -802,7 +579,8 @@ for i in range(len(M2timeofmeasurementp)):
 # plt.legend()
 # =============================================================================
 
-#2.7 Combining beams by determining the average between the four beams
+#Section 3.2.1 in the thesis - Accounting for loss and movement - Combining beams__________________________________________________
+#Combining beams by determining the average between the four beams
 
 M1backscatall=np.zeros((len(M1backscatbeam1_rel1),int(M1DepthADCP)),dtype='float')
 
@@ -827,8 +605,526 @@ for i in range(len(M2timeofmeasurementp)):
         j=j+1
         
     i=i+1
+
+
+
+
+
+
+
+#Section 3.2.2 in the thesis - CTD data processing________________________________________________________________
+
+##Import 
+#Data Kaldfjorden_CTD dataset and extract Salinity, Temperature and Pressure data
+basectd=datetime.datetime(2017,9,7)         #Starttime CTD measurement
+
+#CTD_T1 for Mooring 1
+CTD_M1=netCDF4.Dataset(r'WHALE_CTD_transect_T1.nc', variables=['PSAL','POTEMP','PRES','TIME'])
+CTD_M1_Salinity = CTD_M1['PSAL'][:,2,:]             #Extracting Salinity data
+CTD_M1_Temperature = CTD_M1['POTEMP'][:,2,:]        #Extracting Temperature data
+CTD_M1_Pressure= CTD_M1['PRES'][:]                  #Extracting Pressure data
+CTD_M1_Time=netCDF4._netCDF4.num2date(CTD_M1['TIME'][:,2], units=CTD_M1['TIME'].units, calendar='standard',only_use_cftime_datetimes=False,only_use_python_datetimes=True)
+CTD_M1_Time[5]=np.NaN
+CTD_M1_bins=np.arange(0,len(CTD_M1_Pressure)*2*0.9804139432000052,2*0.9804139432000052)
+
+#CTD_T2 for Mooring 2
+CTD_M2=netCDF4.Dataset(r'WHALE_CTD_transect_T2.nc',variables=['PSAL','POTEMP','PRES','TIME'])
+CTD_M2_Salinity = CTD_M2['PSAL'][:,2,:]             #Unit: Psu              Extracting Salinity data
+CTD_M2_Temperature = CTD_M2['POTEMP'][:,2,:]        #Unit: Degrees Celsius  Extracting Temperature data
+CTD_M2_Pressure= CTD_M2['PRES'][:]                  #Unit: decibar.         Extracting Pressure data
+CTD_M2_Time=netCDF4._netCDF4.num2date(CTD_M2['TIME'][:,2], units=CTD_M2['TIME'].units, calendar='standard',only_use_cftime_datetimes=False, only_use_python_datetimes=True)
+CTD_M2_Time[5]=np.NaN
+CTD_M2_bins=np.arange(0,len(CTD_M2_Pressure)*2*0.9804139432000052,2*0.9804139432000052)
+
+#Section 3.2.2 in the thesis - CTD data processing - data alignment_______________________________________________
+
+#Mooring 1 CTD
+#M1 Temperature for each depth at each time measurement
+CTD_M1_time_month=np.zeros((1,len(CTD_M1_Temperature)),dtype='float')                           
+CTD_M1_time_hours=(pd.Series(CTD_M1_Temperature[:,1],index=CTD_M1_Time).resample('H').mean()).index #resample time from months to hours
+
+CTD_M1_Temp_month=np.zeros((len(M1depth),len(CTD_M1_time_month[0,:])),dtype='float')
+CTD_M1_Temp_hours=np.zeros((len(M1depth),len(CTD_M1_time_hours)),dtype='float')
+
+for i in range(len(CTD_M1_Temperature[:,1])):
+    a=scipy.interpolate.interp1d(CTD_M1_bins,CTD_M1_Temperature[i,:],fill_value='extrapolate')      #interpolate measurments from bins to entire depth ADCP.
+
+    CTD_M1_Temp_month[:,i]=a(M1depth)
     
-#2.8 interpolate all the datasets
+    i=i+1
+
+c=CTD_M1_Temp_month[4,3]        #Fill empty cells with nearest value.
+d=CTD_M1_Temp_month[2,7]
+e=CTD_M1_Temp_month[2,8]
+f=CTD_M1_Temp_month[2,11]
+g=CTD_M1_Temp_month[2,17]
+CTD_M1_Temp_month[0,3]=c
+CTD_M1_Temp_month[1,3]=c
+CTD_M1_Temp_month[2,3]=c
+CTD_M1_Temp_month[3,3]=c
+CTD_M1_Temp_month[0,7]=d
+CTD_M1_Temp_month[1,7]=d
+CTD_M1_Temp_month[0,8]=e
+CTD_M1_Temp_month[1,8]=e
+CTD_M1_Temp_month[0,11]=f
+CTD_M1_Temp_month[1,11]=f
+CTD_M1_Temp_month[0,17]=g
+CTD_M1_Temp_month[1,17]=g
+
+for i in range(len(CTD_M1_Temp_hours[:,1])):
+    
+    a=pd.Series(CTD_M1_Temp_month[i,:],index=CTD_M1_Time).resample('H').mean()      # Interpolate from temperature per month to temperature per hour.
+
+    CTD_M1_Temp_hours[i,:]=a.interpolate(method='time')
+
+    i=i+1
+
+
+#M1 Salinity for each depth at each time measurement # Same as for temperature
+CTD_M1_Sal_month=np.zeros((len(M1depth),len(CTD_M1_time_month[0,:])),dtype='float')
+CTD_M1_Sal_hours=np.zeros((len(M1depth),len(CTD_M1_time_hours)),dtype='float')
+
+for i in range(len(CTD_M1_Salinity[:,1])):
+    a=scipy.interpolate.interp1d(CTD_M1_bins,CTD_M1_Salinity[i,:],fill_value='extrapolate')
+
+    CTD_M1_Sal_month[:,i]=a(M1depth)
+    
+    i=i+1
+
+#a=pd.DataFrame(np.where(CTD_M1_Sal_month>40,np.NaN,CTD_M1_Sal_month))
+#b=a.ffill(axis=0)
+#CTD_M1_Sal_month=np.array(b)
+c=CTD_M1_Sal_month[4,3]
+d=CTD_M1_Sal_month[2,7]
+e=CTD_M1_Sal_month[2,8]
+f=CTD_M1_Sal_month[2,11]
+g=CTD_M1_Sal_month[2,17]
+CTD_M1_Sal_month[0,3]=c
+CTD_M1_Sal_month[1,3]=c
+CTD_M1_Sal_month[2,3]=c
+CTD_M1_Sal_month[3,3]=c
+CTD_M1_Sal_month[0,7]=d
+CTD_M1_Sal_month[1,7]=d
+CTD_M1_Sal_month[0,8]=e
+CTD_M1_Sal_month[1,8]=e
+CTD_M1_Sal_month[0,11]=f
+CTD_M1_Sal_month[1,11]=f
+CTD_M1_Sal_month[0,17]=g
+CTD_M1_Sal_month[1,17]=g
+
+
+for i in range(len(CTD_M1_Sal_hours[:,1])):
+    
+    a=pd.Series(CTD_M1_Sal_month[i,:],index=CTD_M1_Time).resample('H').mean()
+
+    CTD_M1_Sal_hours[i,:]=a.interpolate(method='time')
+
+    i=i+1
+
+#Mooring 2 CTD
+##M2 Temperature for each depth and time of measurement
+CTD_M2_time_month=np.zeros((1,len(CTD_M2_Temperature)),dtype='float')
+CTD_M2_time_hours=(pd.Series(CTD_M2_Temperature[:,1],index=CTD_M2_Time).resample('H').mean()).index
+
+CTD_M2_Temp_month=np.zeros((len(M2depth),len(CTD_M2_time_month[0,:])),dtype='float')
+CTD_M2_Temp_hours=np.zeros((len(M2depth),len(CTD_M2_time_hours)),dtype='float')
+
+for i in range(len(CTD_M2_Temperature[:,1])):
+    a=scipy.interpolate.interp1d(CTD_M2_bins,CTD_M2_Temperature[i,:],fill_value='extrapolate')
+
+    CTD_M2_Temp_month[:,i]=a(M2depth)
+    
+    i=i+1
+
+c=CTD_M2_Temp_month[4,3]
+d=CTD_M2_Temp_month[2,7]
+e=CTD_M2_Temp_month[2,8]
+f=CTD_M2_Temp_month[2,10]
+g=CTD_M2_Temp_month[2,16]
+CTD_M2_Temp_month[0,3]=c
+CTD_M2_Temp_month[1,3]=c
+CTD_M2_Temp_month[2,3]=c
+CTD_M2_Temp_month[3,3]=c
+CTD_M2_Temp_month[0,7]=d
+CTD_M2_Temp_month[1,7]=d
+CTD_M2_Temp_month[0,8]=e
+CTD_M2_Temp_month[1,8]=e
+CTD_M2_Temp_month[0,10]=f
+CTD_M2_Temp_month[1,10]=f
+CTD_M2_Temp_month[0,16]=g
+CTD_M2_Temp_month[1,16]=g
+
+for i in range(len(CTD_M2_Temp_hours[:,1])):
+    
+    a=pd.Series(CTD_M2_Temp_month[i,:],index=CTD_M2_Time).resample('H').mean()
+
+    CTD_M2_Temp_hours[i,:]=a.interpolate(method='time')
+
+    i=i+1
+
+##M2 Salinity for each depth at each time measurement
+CTD_M2_Sal_month=np.zeros((len(M2depth),len(CTD_M2_time_month[0,:])),dtype='float')
+CTD_M2_Sal_hours=np.zeros((len(M2depth),len(CTD_M2_time_hours)),dtype='float')
+
+for i in range(len(CTD_M2_Salinity[:,1])):
+    a=scipy.interpolate.interp1d(CTD_M2_bins,CTD_M2_Salinity[i,:],fill_value='extrapolate')
+
+    CTD_M2_Sal_month[:,i]=a(M2depth)
+    
+    i=i+1
+
+c=CTD_M2_Sal_month[4,3]
+d=CTD_M2_Sal_month[2,7]
+e=CTD_M2_Sal_month[2,8]
+f=CTD_M2_Sal_month[2,10]
+g=CTD_M2_Sal_month[2,16]
+CTD_M2_Sal_month[0,3]=c
+CTD_M2_Sal_month[1,3]=c
+CTD_M2_Sal_month[2,3]=c
+CTD_M2_Sal_month[3,3]=c
+CTD_M2_Sal_month[0,7]=d
+CTD_M2_Sal_month[1,7]=d
+CTD_M2_Sal_month[0,8]=e
+CTD_M2_Sal_month[1,8]=e
+CTD_M2_Sal_month[0,10]=f
+CTD_M2_Sal_month[1,10]=f
+CTD_M2_Sal_month[0,16]=g
+CTD_M2_Sal_month[1,16]=g
+
+for i in range(len(CTD_M2_Sal_hours[:,1])):
+    
+    a=pd.Series(CTD_M2_Sal_month[i,:],index=CTD_M2_Time).resample('H').mean()
+
+    CTD_M2_Sal_hours[i,:]=a.interpolate(method='time')
+
+    i=i+1 
+    
+#Section 3.2.2 in the thesis - CTD data processing - Density computation________________________________________
+M1_Density=np.zeros((len(M1depth),len(M1timeofmeasurementp)),dtype='float')
+M2_Density=np.zeros((len(M2depth),len(M2timeofmeasurementp)),dtype='float')
+
+a=np.min(M1timeofmeasurementp)         #First measurement of ADCP 
+b=np.max(M1timeofmeasurementp)         #Last measurement of ADCP 
+c=np.where(CTD_M1_time_hours==a)       #Row of CTD measurement where ADCP made its FIRST measurement
+d=np.where(CTD_M1_time_hours==b)       #Row of CTD measurement where ADCP made its LAST measurement
+
+for i in range(len(M1depth)):
+    
+    for j in range(len(M1timeofmeasurementp)):
+        
+        e=gsw.density.rho_t_exact(CTD_M1_Sal_hours[i,c[0]+j],CTD_M1_Temp_hours[i,int(c[0]+j)],M1pressure_hours[j,i])
+
+        M1_Density[i,j]=e
+        
+        j=j+1
+        
+    i=i+1
+    
+    
+a=np.min(M2timeofmeasurementp)         #First measurement of ADCP 
+b=np.max(M2timeofmeasurementp)         #Last measurement of ADCP 
+c=np.where(CTD_M2_time_hours==a)       #Row of CTD measurement where ADCP made its FIRST measurement
+d=np.where(CTD_M2_time_hours==b)       #Row of CTD measurement where ADCP made its LAST measurement
+
+for i in range(len(M2depth)):
+    
+    for j in range(len(M2timeofmeasurementp)):
+        
+        e=gsw.density.rho_t_exact(CTD_M2_Sal_hours[i,c[0]+j],CTD_M2_Temp_hours[i,int(c[0]+j)],M2pressure_hours[j,i])
+
+        M2_Density[i,j]=e
+        
+        j=j+1
+        
+    i=i+1
+
+
+
+
+#Section 3.2.2 in the thesis - Sediment trap data processing_______________________________________________________________________
+
+#Import Sediment trap data Kaldfjorden
+df=pd.DataFrame(pd.read_csv('Kaldfjorden sediment trap data.csv', sep=';',error_bad_lines=False))
+Timestart=pd.to_datetime(df['start'], format='%d/%m/%Y')# + ' to ' + df['POC (mg C m-2 d-1).1']
+Timeend=pd.to_datetime(df['end'], format='%d/%m/%Y')
+apoc=df['POC (mg C m-2 d-1).1']
+atpm=df['TPM (g m-2 d-1).1']
+achl=df['Chl a (ug m-2 d-1).1']
+aphy=df['Diatoms total (million cells m-2 d-1).1']
+azoo=df['Zooplankton Swimmers.1']
+bpoc=df['POC (mg C m-2 d-1)']
+btpm=df['TPM (g m-2 d-1)']
+bchl=df['Chl a (ug m-2 d-1)']
+bphy=df['Diatoms total (million cells m-2 d-1)']
+bzoo=df['Zooplankton Swimmers']
+
+#Section 3.2.2 in the thesis - Sediment trap data processing - data alignment__________________________________________
+
+##Sediment trap measurements monthly to hourly    
+M1timeofmeasurement=pd.to_datetime(M1timeofmeasurementp[:,0],format='%H:%M %d/%m/%Y')
+M2timeofmeasurement=pd.to_datetime(M2timeofmeasurementp[:,0],format='%H:%M %d/%m/%Y')
+           
+M1poc=np.zeros(((len(M1timeofmeasurement),1)),dtype='float')
+M1tpm=np.zeros(((len(M1timeofmeasurement),1)),dtype='float')
+M1chl=np.zeros(((len(M1timeofmeasurement),1)),dtype='float')
+M1phy=np.zeros(((len(M1timeofmeasurement),1)),dtype='float')
+M1zoo=np.zeros(((len(M1timeofmeasurement),1)),dtype='float')
+M2poc=np.zeros(((len(M2timeofmeasurement),1)),dtype='float')
+M2tpm=np.zeros(((len(M2timeofmeasurement),1)),dtype='float')
+M2chl=np.zeros(((len(M2timeofmeasurement),1)),dtype='float')
+M2phy=np.zeros(((len(M2timeofmeasurement),1)),dtype='float')
+M2zoo=np.zeros(((len(M2timeofmeasurement),1)),dtype='float')
+   
+for i in range(len(M1timeofmeasurement)):
+    
+    for j in range(len(apoc)):
+        
+        if Timestart[j] <= M1timeofmeasurement[i] <= Timeend[j]:        # if time of measurement is inbetween start and finish of measurement
+            M1poc[i,0]=apoc[j]
+            M1tpm[i,0]=atpm[j]
+            M1chl[i,0]=achl[j]
+            M1phy[i,0]=aphy[j]
+            M1zoo[i,0]=azoo[j]
+        
+            j=j+1
+    i=i+1
+    
+for i in range(len(M2timeofmeasurement)):
+    
+    for j in range(len(bpoc)):
+              
+        if Timestart[j] <= M2timeofmeasurement[i] <= Timeend[j]:        # if time of measurement is inbetween start and finish of measurement
+            M2poc[i,0]=bpoc[j]
+            M2tpm[i,0]=btpm[j]
+            M2chl[i,0]=bchl[j]
+            M2phy[i,0]=bphy[j]
+            M2zoo[i,0]=bzoo[j]
+
+            j=j+1
+    i=i+1
+    
+#Deviding measurements for each date -> to make them ready for plotting
+a=pd.read_csv('Kaldfjorden_short_exported biomass.csv',sep=',')
+SSexportbiomtot=a
+SSexportbiom={'2017-10-05 00:00:00':a.iloc[0:4,:],
+              '2017-11-06 00:00:00':a.iloc[4:8,:],
+              '2017-12-01 00:00:00':a.iloc[8:12,:],
+              '2018-01-25 00:00:00':a.iloc[12:16,:],
+              '2018-02-15 00:00:00':a.iloc[16:20,:],
+              '2018-03-14 00:00:00':a.iloc[20:24,:],
+              '2018-04-04 00:00:00':a.iloc[24:28,:],
+              '2018-05-22 00:00:00':a.iloc[28:32,:]}
+
+a=pd.read_csv('Kaldfjorden_short_suspended biomass.csv',sep=',')
+SSsuspbiomtot=a
+SSsuspbiom={'2017-10-05 00:00:00':a.iloc[0:4,:],
+              '2017-11-06 00:00:00':a.iloc[4:8,:],
+              '2017-12-01 00:00:00':a.iloc[8:12,:],
+              '2018-01-25 00:00:00':a.iloc[12:16,:],
+              '2018-02-15 00:00:00':a.iloc[16:20,:],
+              '2018-03-14 00:00:00':a.iloc[20:24,:],
+              '2018-04-04 00:00:00':a.iloc[24:28,:],
+              '2018-05-22 00:00:00':a.iloc[28:32,:]}
+
+a=pd.read_csv('Kaldfjorden_short_zooplankton_import.csv',sep=';')
+SSzooplanktontot=a
+SSzooplankton={'2017-10-05 00:00:00':a.iloc[:,2],
+              '2017-11-06 00:00:00':a.iloc[:,3],
+              '2017-12-01 00:00:00':a.iloc[:,4],
+              '2018-01-25 00:00:00':a.iloc[:,5],
+              '2018-02-15 00:00:00':a.iloc[:,6],
+              '2018-03-14 00:00:00':a.iloc[:,7],
+              '2018-04-04 00:00:00':a.iloc[:,8],
+              '2018-05-22 00:00:00':a.iloc[:,9]}
+
+SSdates=np.zeros((2,8),dtype='datetime64[m]')
+SSdates[0,0]=pd.to_datetime('2017/10/05 12:24',format='%Y/%m/%d %H:%M') ; SSdates[1,0]=pd.to_datetime('2017/10/06 12:35',format='%Y/%m/%d %H:%M')
+SSdates[0,1]=pd.to_datetime('2017/11/06 10:50',format='%Y/%m/%d %H:%M') ; SSdates[1,1]=pd.to_datetime('2017/11/07 11:40',format='%Y/%m/%d %H:%M')
+SSdates[0,2]=pd.to_datetime('2017/12/01 09:30',format='%Y/%m/%d %H:%M') ; SSdates[1,2]=pd.to_datetime('2017/12/02 09:50',format='%Y/%m/%d %H:%M')
+SSdates[0,3]=pd.to_datetime('2018/01/25 09:40',format='%Y/%m/%d %H:%M') ; SSdates[1,3]=pd.to_datetime('2018/01/26 10:40',format='%Y/%m/%d %H:%M')
+SSdates[0,4]=pd.to_datetime('2018/02/15 10:30',format='%Y/%m/%d %H:%M') ; SSdates[1,4]=pd.to_datetime('2018/02/16 12:30',format='%Y/%m/%d %H:%M')
+SSdates[0,5]=pd.to_datetime('2018/03/13 21:16',format='%Y/%m/%d %H:%M') ; SSdates[1,5]=pd.to_datetime('2018/03/14 21:00',format='%Y/%m/%d %H:%M')
+SSdates[0,6]=pd.to_datetime('2018/04/04 16:43',format='%Y/%m/%d %H:%M') ; SSdates[1,6]=pd.to_datetime('2018/04/05 18:00',format='%Y/%m/%d %H:%M')
+SSdates[0,7]=pd.to_datetime('2018/05/22 10:10',format='%Y/%m/%d %H:%M') ; SSdates[1,7]=pd.to_datetime('2018/05/23 10:50',format='%Y/%m/%d %H:%M')
+
+SSdates1=pd.Series(['2017-10-05 00:00:00',
+                   '2017-11-06 00:00:00',
+                   '2017-12-01 00:00:00',
+                   '2018-01-25 00:00:00',
+                   '2018-02-15 00:00:00',
+                   '2018-03-14 00:00:00',
+                   '2018-04-04 00:00:00',
+                   '2018-05-22 00:00:00'])
+
+M1timeofmeasurement=Kaldfjordencleandata['ADCP_M1timeofmeasurement']
+M2timeofmeasurement=Kaldfjordencleandata['ADCP_M2timeofmeasurement']
+
+SSBackscatM1=np.zeros((len(SSdates[1,:]),7),dtype='float')
+SSBackscatM2=np.zeros((len(SSdates[1,:]),7),dtype='float')
+
+i=4
+for i in range(len(SSdates[1,:])):
+    
+    #M1
+    begin=np.argmin(np.abs(SSdates[0,i] - M1timeofmeasurement[:]))
+    end=np.argmin(np.abs(SSdates[1,i] - M1timeofmeasurement[:]))
+
+    SSBackscatM1[i,0]=np.sum(M1backscatallint.iloc[int(begin):int(end),20])
+    SSBackscatM1[i,1]=np.sum(M1backscatallint.iloc[int(begin):int(end),30])
+    SSBackscatM1[i,2]=np.sum(M1backscatallint.iloc[int(begin):int(end),50])
+    SSBackscatM1[i,3]=np.sum(M1backscatallint.iloc[int(begin):int(end),90])
+    SSBackscatM1[i,4]=np.sum(np.sum(M1backscatallint.iloc[int(begin):int(end),20:50]))
+    SSBackscatM1[i,5]=np.sum(np.sum(M1backscatallint.iloc[int(begin):int(end),50:100]))
+    SSBackscatM1[i,6]=np.sum(np.sum(M1backscatallint.iloc[int(begin):int(end),20:100]))
+    
+    #M2
+    begin=np.argmin(np.abs(SSdates[0,i] - M2timeofmeasurement[:]))
+    end=np.argmin(np.abs(SSdates[1,i] - M2timeofmeasurement[:]))
+
+    SSBackscatM2[i,0]=np.sum(M2backscatallint.iloc[int(begin):int(end),20])
+    SSBackscatM2[i,1]=np.sum(M2backscatallint.iloc[int(begin):int(end),30])
+    SSBackscatM2[i,2]=np.sum(M2backscatallint.iloc[int(begin):int(end),50])
+    SSBackscatM2[i,3]=np.sum(M2backscatallint.iloc[int(begin):int(end),90])
+    SSBackscatM2[i,4]=np.sum(np.sum(M2backscatallint.iloc[int(begin):int(end),20:50]))
+    SSBackscatM2[i,5]=np.sum(np.sum(M2backscatallint.iloc[int(begin):int(end),50:100]))
+    SSBackscatM2[i,6]=np.sum(np.sum(M2backscatallint.iloc[int(begin):int(end),20:100]))
+
+    i=i+1
+
+SSPOCfluxplot={'20m':[184.56,198.23,43.35,121.57,114.71,46.78,130.03,229.4],
+               '30m':[131.78,146.18,54.3,102.99,128.79,48.13,96.13,244.53],
+               '50m':[168.75,145.8,62.98,115.65,134.21,53.63,112.65,214.51],
+               '90m':[126.08,180.36,96.48,115.9,150.38,66.4,259.25,314.67]}
+
+SSChlafluxplot={'20m':[1.21,0.53,0.09,0.07,0.11,0.04,5.34,0.89],
+               '30m':[1.37,0.58,0.11,0.1,0.08,0.04,3.87,0.4],
+               '50m':[1.14,0.58,0.1,0.07,0.1,0.04,3.42,0.3],
+               '90m':[1.1,0.66,0.1,0.1,0.08,0.05,3.15,0.22]}    
+
+    
+
+#Section 3.2.2 in the thesis - Meteorological data processing________________________________________________________
+
+#Import csv
+Temperature=pd.read_csv('Kaldfjorden weather_atmospheric temp.csv', sep=';',error_bad_lines=False)
+Wind=pd.read_csv('Kaldfjorden weather_wind(direc).csv', sep=';',error_bad_lines=False)
+Precipitation=pd.read_csv('Kaldfjorden weather_precipitation.csv', sep=';', error_bad_lines=False)
+Radiation=pd.read_csv('Kaldfjorden weather_solar radiance.csv', sep=',',error_bad_lines=False)
+Radiation.iloc[:,1]=Radiation.iloc[:,1]
+
+
+#Section 3.2.2 in the thesis - Meteorological data processing - data alignment________________________________________________________
+Timerad=np.zeros((len(Radiation.iloc[:,1])),dtype='datetime64[s]')
+
+for i in range(len(Radiation)):
+
+    if len(str(Radiation.iloc[i,1])) == 1: 
+        a=str('00000')+str(Radiation.iloc[i,1])
+        
+    if len(str(Radiation.iloc[i,1])) == 2: 
+        a=str('0000')+str(Radiation.iloc[i,1])
+        
+    if len(str(Radiation.iloc[i,1])) == 3:
+        a=str('000')+str(Radiation.iloc[i,1])
+        
+    if len(str(Radiation.iloc[i,1])) == 4:
+        a=str('00')+str(Radiation.iloc[i,1])
+    
+    if len(str(Radiation.iloc[i,1])) == 5:
+        a=str('0')+str(Radiation.iloc[i,1])
+        
+    if len(str(Radiation.iloc[i,1])) == 6:
+        a=str(Radiation.iloc[i,1])
+    
+    Timerad[i]=datetime.datetime.strptime(str(Radiation.iloc[i,0])+a,'%Y%m%d%H%M%S')
+    
+    i=i+1
+
+#This is the Radiation per minute.
+a=Radiation.iloc[:,2]
+a.index=Timerad
+
+Rad_M1=a[55358:501916]
+Rad_time_M1=Timerad[55358:501916]
+Rad_M2=a[55658:501916]
+Rad_time_M2=Timerad[55658:501916]
+
+#Temperature
+WTempHekfyr=Temperature.iloc[924:8410,3]
+WTempHekfyrtime=pd.to_datetime(Temperature.iloc[924:8410,2], format='%d.%m.%Y %H:%M')
+WTempLangnes=Temperature.iloc[9684:17168,3]
+WTempLangnestime=pd.to_datetime(Temperature.iloc[9684:17168,2], format='%d.%m.%Y %H:%M')
+WTempMasvik=Temperature.iloc[18442:25928,3]
+WTempMasviktime=pd.to_datetime(Temperature.iloc[18442:25928,2], format='%d.%m.%Y %H:%M')
+
+#Wind
+WWindHekfyrtime=pd.to_datetime(Wind.iloc[924:8409,2], format='%d.%m.%Y %H:%M')
+WWindHekfyr=Wind.iloc[924:8409,3]
+WWinddirHekfyr=Wind.iloc[924:8409,4]
+
+WWindLangnestime=pd.to_datetime(Wind.iloc[9684:17156,2], format='%d.%m.%Y %H:%M')
+WWindLangnes=Wind.iloc[9684:17156,3]
+WWinddirLangnes=Wind.iloc[9684:17156,4]
+
+#Precipitation
+WPrecipitation_time=pd.to_datetime(Precipitation.iloc[12:7497,2], format='%d.%m.%Y %H:%M')
+WPrecipitation=Precipitation.iloc[12:7497,3] 
+
+#Section 3.2.2 in the thesis - Aquaculture data processing______________________________________________________________
+
+#Import
+Aquaculture=pd.read_csv('Kaldfjorden_aquaculture_import.csv',sep=';')
+AC_Time=pd.to_datetime(np.unique(Aquaculture.iloc[:,0]),format='%d/%m/%Y')
+AC_Time=np.sort(AC_Time)
+
+a=np.where(Aquaculture.iloc[:,3]==1)
+Aquacultureunit1=Aquaculture.iloc[a]
+
+a=np.where(Aquaculture.iloc[:,3]==2)
+Aquacultureunit2=Aquaculture.iloc[a]
+
+a=np.where(Aquaculture.iloc[:,3]==3)
+Aquacultureunit3=Aquaculture.iloc[a]
+
+a=np.where(Aquaculture.iloc[:,3]==4)
+Aquacultureunit4=Aquaculture.iloc[a]
+
+a=np.where(Aquaculture.iloc[:,3]==5)
+Aquacultureunit5=Aquaculture.iloc[a]
+
+Feeding=np.zeros((1,len(AC_Time)),dtype='float')
+
+i=584
+for i in range(len(AC_Time)):
+    
+    a=AC_Time[i]
+    a1=np.where(np.abs(AC_Time[i] == pd.to_datetime(Aquacultureunit1.iloc[:,0],format='%d/%m/%Y')))
+    a2=np.where(np.abs(AC_Time[i] == pd.to_datetime(Aquacultureunit2.iloc[:,0],format='%d/%m/%Y')))
+    a3=np.where(np.abs(AC_Time[i] == pd.to_datetime(Aquacultureunit3.iloc[:,0],format='%d/%m/%Y')))
+    a4=np.where(np.abs(AC_Time[i] == pd.to_datetime(Aquacultureunit4.iloc[:,0],format='%d/%m/%Y')))
+    a5=np.where(np.abs(AC_Time[i] == pd.to_datetime(Aquacultureunit5.iloc[:,0],format='%d/%m/%Y')))
+
+    if not all(a1) is True : b1=0
+    else: b1=float(Aquacultureunit1.iloc[int(a1[0]),15])
+
+    if not all(a2) is True : b2=0
+    else: b2=float(Aquacultureunit2.iloc[int(a2[0]),15])
+
+    if not all(a3) is True : b3=0
+    else: b3=float(Aquacultureunit3.iloc[int(a3[0]),15])
+
+    if not all(a4) is True : b4=0
+    else: b4=float(Aquacultureunit4.iloc[int(a4[0]),15])
+
+    if not all(a5) is True : b5=0
+    else: b5=float(Aquacultureunit5.iloc[int(a5[0]),15])
+
+    Feeding[0,i]=b1+b2+b3+b4+b5
+
+    i=i+1
+
+
+#Section 3.2.3 in the thesis - time series analysis - interpolate all the datasets_________________________________________________________________
 a=pd.DataFrame(M1backscatall)
 M1backscatallint=a.interpolate(method='linear', axis='columns',limit_direction='both')
 #plt.plot(M1depth,a.iloc[4000,:],'bo', M1depth, M1backscatallint.iloc[4000,:],'r')    
@@ -853,7 +1149,8 @@ a=pd.DataFrame(M2vup2)
 M2vup2int=a.interpolate(method='linear', axis='columns',limit_direction='both')
 #plt.plot(M2depth,a.iloc[4000,:],'bo', M2depth, M2vup2int.iloc[4000,:],'r')    
 
-#2.9 FFT -> get the underlying signal out.
+#Section 3.2.3 in the thesis - time series analysis - FFT_________________________________________________________________
+
 numbersig=10
 
 #Mooring1 - backscat
@@ -976,9 +1273,8 @@ for i in range(len(M2backscatallint.iloc[1,:])-1):
 
     i=i+1    
 
-#CHAPTER 3. MAKING THE DATA PRESENTABLE_______________________________________________
+#Section 3.2.3 in the thesis - time series analysis - Low-pass filter_________________________________________________________________
 
-#3.1 FILTER
 #Make new datasets for lowpassed data    
 
 #6h
@@ -1113,7 +1409,8 @@ for i in range(len(M2backscatall[1,:])):
 
     i=i+1
 
-#Bandpass filter
+#Section 3.2.3 in the thesis - time series analysis - Band-pass filter_________________________________________________________________
+
 #M1
 dt=1            
 nyq=1/2/dt
@@ -1397,21 +1694,7 @@ for i in range(len(M1Weeks)):                             #Mark beginning and en
  
     i=i+1
 
-#Sort ADCP backscatter and vertical velocity data in weeks    
-M1backscatweek= {}
-M1velup1ano={}
-M1velup2ano={}
-
-for i in range(len(M1Weeks)-1):
-
-    start=np.where(M1timeofmeasurement==M1Weeks[i,0])
-    end=np.where(M1timeofmeasurement==M1Weeks[i,1])
-    M1backscatweek[i]=M1_Backscat_lowpass6h[int(start[0]):int(end[0]),:]
-    M1velup1ano[i]=M1vup1[int(start[0]):int(end[0]),:]
-    M1velup2ano[i]=M1vup2[int(start[0]):int(end[0]),:]
-    
-    i=i+1
-
+#Section 3.2.3 in the thesis - time series analysis - Model days_________________________________________________________________
 #MODEL DAY by averiging 9am for 6 days, 10am, etc. to have a 24 average where an everage 24h is visible.
 hours=np.arange(0,24,1)
 M16dav={}
@@ -1598,47 +1881,7 @@ for j in range (len(M2Weeks)-1):
 plt.plot(M1tvg[1,:])
 plt.plot(M2tvg[1,:])
 
-#4. Potential density computation_____________________________________________________________________
-M1_Density=np.zeros((len(M1depth),len(M1timeofmeasurementp)),dtype='float')
-M2_Density=np.zeros((len(M2depth),len(M2timeofmeasurementp)),dtype='float')
-
-a=np.min(M1timeofmeasurementp)         #First measurement of ADCP 
-b=np.max(M1timeofmeasurementp)         #Last measurement of ADCP 
-c=np.where(CTD_M1_time_hours==a)       #Row of CTD measurement where ADCP made its FIRST measurement
-d=np.where(CTD_M1_time_hours==b)       #Row of CTD measurement where ADCP made its LAST measurement
-
-for i in range(len(M1depth)):
-    
-    for j in range(len(M1timeofmeasurementp)):
-        
-        e=gsw.density.rho_t_exact(CTD_M1_Sal_hours[i,c[0]+j],CTD_M1_Temp_hours[i,int(c[0]+j)],M1pressure_hours[j,i])
-
-        M1_Density[i,j]=e
-        
-        j=j+1
-        
-    i=i+1
-    
-    
-a=np.min(M2timeofmeasurementp)         #First measurement of ADCP 
-b=np.max(M2timeofmeasurementp)         #Last measurement of ADCP 
-c=np.where(CTD_M2_time_hours==a)       #Row of CTD measurement where ADCP made its FIRST measurement
-d=np.where(CTD_M2_time_hours==b)       #Row of CTD measurement where ADCP made its LAST measurement
-
-for i in range(len(M2depth)):
-    
-    for j in range(len(M2timeofmeasurementp)):
-        
-        e=gsw.density.rho_t_exact(CTD_M2_Sal_hours[i,c[0]+j],CTD_M2_Temp_hours[i,int(c[0]+j)],M2pressure_hours[j,i])
-
-        M2_Density[i,j]=e
-        
-        j=j+1
-        
-    i=i+1
-
-
-#Distribution plots -> colourschemes come from here.
+#Distribution plots -> Determine colourschemes on basis of these plots.
 # =============================================================================
 # seaborn.displot(M1backscatall[:,0:163],binwidth=5, legend=False)
 # seaborn.displot(M1backscatallint.iloc[:,20:163],binwidth=10,legend=False)
