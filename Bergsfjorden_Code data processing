@@ -762,7 +762,7 @@ for i in range(len(Backscatcol1_3.iloc[1,:])-1):
     i=i+1
 
 
-#OUTPUT Data for plotting in 'Bergsfjorden ...'
+#OUTPUT Data for plotting in 'Bergsfjorden time series analysis plots'
 Bergsfjorden={      
                     'Backscatcol1':Backscatcol1_3,
                     'Backscatcol1_6dav':Backscatcol1_6dav,
